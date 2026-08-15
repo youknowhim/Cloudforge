@@ -20,6 +20,11 @@ app.get("/", (_req, res) => {
   });
 });
 
+app.use((_req, res, next) => {
+  console.log("API Gateway → Express:", _req.method, _req.originalUrl);
+  console.log("Headers:", _req.headers);
+  next();
+});
 
 // file routes
 
