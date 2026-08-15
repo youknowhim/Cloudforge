@@ -1,0 +1,253 @@
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--overlay);
+  backdrop-filter: blur(2px);
+  animation: overlay-in 0.16s var(--ease);
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.modal {
+  width: 100%;
+  max-width: 560px;
+  max-height: calc(100svh - 48px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-3);
+  animation: modal-in 0.18s var(--ease);
+  overflow: hidden;
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+
+/* header --------------------------------------------------- */
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 14px 16px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.modal-heading {
+  min-width: 0;
+  flex: 1;
+}
+
+.modal-heading h2 {
+  font-size: 16.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal-heading p {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* body ----------------------------------------------------- */
+
+.modal-body {
+  padding: 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-preview {
+  display: grid;
+  place-items: center;
+  min-height: 150px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.modal-preview img {
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: var(--r-sm);
+  object-fit: contain;
+}
+
+.modal-preview video {
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: var(--r-sm);
+}
+
+.modal-preview audio {
+  width: 100%;
+}
+
+.modal-preview iframe {
+  width: 100%;
+  height: 320px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+
+.modal-preview-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+
+.modal-description {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+}
+
+.modal-meta {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--line);
+  overflow: hidden;
+}
+
+.modal-meta > div {
+  padding: 10px 12px;
+  background: var(--surface);
+}
+
+.modal-meta dt {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 3px;
+}
+
+.modal-meta dd {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ink);
+  word-break: break-word;
+}
+
+/* edit form ------------------------------------------------ */
+
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.modal-visibility {
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+
+.modal-visibility strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 550;
+  color: var(--ink);
+}
+
+.modal-visibility .hint {
+  display: block;
+  margin-top: 2px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* footer --------------------------------------------------- */
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.modal-footer-right {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.modal-confirm-text {
+  flex: 1;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.btn--disabled {
+  pointer-events: none;
+  opacity: 0.52;
+}
+
+@media (max-width: 620px) {
+  .modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .modal {
+    max-width: none;
+    max-height: 92svh;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+  }
+
+  .modal-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-footer {
+    flex-wrap: wrap;
+  }
+
+  .modal-footer-right {
+    width: 100%;
+  }
+
+  .modal-footer-right .btn {
+    flex: 1;
+  }
+}

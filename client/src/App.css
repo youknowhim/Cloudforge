@@ -1,0 +1,91 @@
+/* Shared page furniture used by more than one route. */
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 34px 0 22px;
+}
+
+.page-head h1 {
+  margin: 6px 0 5px;
+}
+
+.page-head p {
+  font-size: 14.5px;
+  color: var(--ink-2);
+  max-width: 58ch;
+}
+
+.page-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+@media (max-width: 720px) {
+  .page-head {
+    flex-direction: column;
+    align-items: stretch;
+    padding-top: 26px;
+  }
+}
+
+/* empty / error states ------------------------------------- */
+
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 72px 24px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+}
+
+.state-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 8px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-3);
+  box-shadow: var(--shadow-1);
+}
+
+.state h2 {
+  font-size: 17px;
+}
+
+.state p {
+  font-size: 14px;
+  color: var(--ink-2);
+  max-width: 44ch;
+}
+
+.state .btn {
+  margin-top: 14px;
+}
+
+/* 404 ------------------------------------------------------ */
+
+.not-found .shell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding-top: 120px;
+  padding-bottom: 120px;
+  max-width: 560px;
+}
+
+.not-found .btn {
+  margin-top: 12px;
+}
