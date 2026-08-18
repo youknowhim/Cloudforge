@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import cors from "cors";
 
 import fileRoutes from "./src/routes/file.route";
 
@@ -10,6 +11,13 @@ const app = express();
 app.use(express.json());
 
 app.use(express.urlencoded({ extended: true }));
+app.use(
+  cors({
+    origin: "https://cloudforge-coral-theta.vercel.app",
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 
 // health
