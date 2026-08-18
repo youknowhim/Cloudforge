@@ -289,7 +289,7 @@ export async function getFileById(
 
     /* ---------- Check processing status ---------- */
 
-    if (file.status !== "COMPLETED") {
+    if (file.status !== "clean") {
       return res.status(409).json({
         message: "File is still being processed",
         status: file.status,
