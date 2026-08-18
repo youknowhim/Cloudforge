@@ -189,7 +189,7 @@ export async function getFiles(
         created_at,
         updated_at
       FROM files
-      WHERE status = 'COMPLETED'
+      WHERE status = 'clean'
         AND (
           user_id = $1
           OR public_access = TRUE
