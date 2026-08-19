@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 
 import { pool } from "../database/postgres";
 import { AuthenticatedRequest } from "../middlewares/auth.middleware";
+import  redis  from "../cache/redis";
 
 import {
   generateUploadUrl,
@@ -172,6 +173,17 @@ export async function getFiles(
 ) {
   try {
     const userId = req.user!.id;
+        const cacheKey = `files:user:${userId}`;
+
+    // 1. Check Redis
+    const cachedFiles = await redis.get(cacheKey);
+
+    if (cachedFiles) {
+
+      return res.status(200).json({
+        files: JSON.parse(cachedFiles),
+      });
+    }
 
     const result = await pool.query(
       `
@@ -197,6 +209,15 @@ export async function getFiles(
       ORDER BY created_at DESC
       `,
       [userId]
+    );
+
+    // 3. Store result in Redis
+    await redis.set(
+      cacheKey,
+      JSON.stringify(result.rows),
+      {
+        ex: 60,
+      }
     );
 
 
@@ -236,77 +257,100 @@ export async function getFileById(
 ) {
   try {
     const userId = req.user!.id;
-
     const { id } = req.params;
 
+    const cacheKey = `files:${id}:user:${userId}`;
 
-    /* ---------- Get file from PostgreSQL ---------- */
+  const cachedFile = await redis.get(cacheKey);
 
-    const result = await pool.query(
-      `
-      SELECT
-        id,
-        user_id,
-        file_name,
-        title,
-        description,
-        mime_type,
-        size,
-        s3_key,
-        public_access,
-        status,
-        created_at,
-        updated_at
-      FROM files
-      WHERE id = $1
-      `,
-      [id]
-    );
+if (cachedFile) {
+  // console.log("Redis HIT");
 
+  const file = JSON.parse(cachedFile);
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        message: "File not found",
-      });
-    }
+  const downloadUrl = await generateDownloadUrl(
+    file.s3_key
+  );
 
+  return res.status(200).json({
+    file: {
+      id: file.id,
+      fileName: file.file_name,
+      title: file.title,
+      description: file.description,
+      mimeType: file.mime_type,
+      size: file.size,
+      publicAccess: file.public_access,
+      status: file.status,
+      createdAt: file.created_at,
+      updatedAt: file.updated_at,
+    },
+    downloadUrl,
+    expiresIn: 900,
+  });
+}
 
-    const file = result.rows[0];
+      // 2. Redis miss --> PostgreSQL
+      const result = await pool.query(
+        `
+        SELECT
+          id,
+          user_id,
+          file_name,
+          title,
+          description,
+          mime_type,
+          size,
+          s3_key,
+          public_access,
+          status,
+          created_at,
+          updated_at
+        FROM files
+        WHERE id = $1
+        `,
+        [id]
+      );
 
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          message: "File not found",
+        });
+      }
 
-    /* ---------- Authorization ---------- */
+      const file = result.rows[0];
 
-    const isOwner =
-      String(file.user_id) === String(userId);
+      // 3. Authorization BEFORE caching/returning
+      const isOwner =
+        String(file.user_id) === String(userId);
 
+      if (!isOwner && !file.public_access) {
+        return res.status(403).json({
+          message: "You are not allowed to access this file",
+        });
+      }
 
-    if (!isOwner && !file.public_access) {
-      return res.status(403).json({
-        message: "You are not allowed to access this file",
-      });
-    }
+      if (file.status !== "clean") {
+        return res.status(409).json({
+          message: "File is still being processed",
+          status: file.status,
+        });
+      }
 
+      // 4. Cache metadata
+      await redis.set(
+        cacheKey,
+        JSON.stringify(file),
+        {
+          ex: 60,
+        }
+      );
 
-    /* ---------- Check processing status ---------- */
-
-    if (file.status !== "clean") {
-      return res.status(409).json({
-        message: "File is still being processed",
-        status: file.status,
-      });
-    }
-
-
-    /* ---------- Generate S3 download URL ---------- */
-
+    // 5. Generate fresh signed URL
     const downloadUrl =
       await generateDownloadUrl(file.s3_key);
 
-
-    /* ---------- Return metadata + URL ---------- */
-
     return res.status(200).json({
-
       file: {
         id: file.id,
         fileName: file.file_name,
@@ -326,7 +370,6 @@ export async function getFileById(
     });
 
   } catch (error) {
-
     console.error(
       "Get file by ID error:",
       error
