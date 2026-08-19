@@ -181,7 +181,7 @@ export async function getFiles(
     if (cachedFiles) {
 
       return res.status(200).json({
-        files: JSON.parse(cachedFiles),
+        files: JSON.parse(String(cachedFiles)),
       });
     }
 
@@ -266,7 +266,7 @@ export async function getFileById(
 if (cachedFile) {
   // console.log("Redis HIT");
 
-  const file = JSON.parse(cachedFile);
+  const file = JSON.parse(String(cachedFile!));
 
   const downloadUrl = await generateDownloadUrl(
     file.s3_key
