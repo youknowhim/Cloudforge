@@ -37,6 +37,20 @@ import {
    PostgreSQL INSERT
    ========================================================= */
 
+   interface CachedFile {
+  id: string;
+  user_id: string;
+  file_name: string;
+  title: string;
+  description: string;
+  mime_type: string;
+  size: number;
+  s3_key: string;
+  public_access: boolean;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
 export async function createFile(
   req: AuthenticatedRequest,
   res: Response
@@ -176,7 +190,7 @@ export async function getFiles(
         const cacheKey = `files:user:${userId}`;
 
     // 1. Check Redis
-    const cachedFiles = await redis.get(cacheKey);
+    const cachedFiles = await redis.get<CachedFile[]>(cacheKey);
 
     if (cachedFiles) {
 
@@ -261,12 +275,12 @@ export async function getFileById(
 
     const cacheKey = `files:${id}:user:${userId}`;
 
-  const cachedFile = await redis.get(cacheKey);
+  const cachedFile = await redis.get<CachedFile>(cacheKey);
 
 if (cachedFile) {
   // console.log("Redis HIT");
 
-  const file = JSON.parse(String(cachedFile!));
+  const file = cachedFile;
 
   const downloadUrl = await generateDownloadUrl(
     file.s3_key
@@ -340,7 +354,7 @@ if (cachedFile) {
       // 4. Cache metadata
       await redis.set(
         cacheKey,
-        JSON.stringify(file),
+        file,
         {
           ex: 60,
         }
