@@ -181,7 +181,7 @@ export async function getFiles(
     if (cachedFiles) {
 
       return res.status(200).json({
-        files: JSON.parse(String(cachedFiles)),
+        files: cachedFiles,
       });
     }
 
@@ -214,7 +214,7 @@ export async function getFiles(
     // 3. Store result in Redis
     await redis.set(
       cacheKey,
-      JSON.stringify(result.rows),
+      result.rows,
       {
         ex: 60,
       }
