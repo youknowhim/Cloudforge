@@ -1,8 +1,15 @@
-export type FileStatus =
-  | "PENDING"
-  | "PROCESSING"
-  | "COMPLETED"
-  | "FAILED";
+/*
+  `clean` is what the processing lambda writes once a file has been
+  accepted. `processing` never comes from the API — it is the local
+  placeholder the UI shows between "upload finished" and "the lambda
+  has written the row".
+*/
+export type FileStatus = "processing" | "clean" | "failed";
+
+export interface FileOwner {
+  name?: string;
+  email?: string;
+}
 
 export interface CloudFile {
   id: string;
@@ -17,11 +24,17 @@ export interface CloudFile {
 
   s3Key?: string;
 
-  publicAccess: boolean;
+  /* the API returns exactly one of these two, never both */
+  sharedWith: string[];
+  sharedBy?: FileOwner;
+
   status: FileStatus;
 
   createdAt?: string;
   updatedAt?: string;
+
+  /* true only for the optimistic card shown right after an upload */
+  pending?: boolean;
 }
 
 export interface FileMetadata {
@@ -30,7 +43,7 @@ export interface FileMetadata {
   description: string;
   mimeType: string;
   size: number;
-  publicAccess: boolean;
+  share_to_emails: string[];
 }
 
 export interface CreateFileResponse {
@@ -50,5 +63,9 @@ export interface FileDetail {
 export interface FileUpdate {
   title?: string;
   description?: string;
-  publicAccess?: boolean;
+  share_to_emails?: string[];
+}
+
+export interface EmailCheckResult {
+  exists: boolean;
 }

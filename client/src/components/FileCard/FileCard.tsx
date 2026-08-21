@@ -7,7 +7,7 @@ import {
 } from "react";
 
 import { describeFile } from "../../lib/fileKind";
-import { formatBytes, formatRelative } from "../../lib/format";
+import { formatBytes, formatRelative, initialsOf } from "../../lib/format";
 import type { CloudFile } from "../../types/file";
 
 import Highlight from "../Highlight/Highlight";
@@ -21,11 +21,25 @@ export interface FileCardProps {
   isOwner: boolean;
   query?: string;
   downloading?: boolean;
+  deleting?: boolean;
   onOpen: (file: CloudFile) => void;
   onDownload: (file: CloudFile) => void;
   onEdit: (file: CloudFile) => void;
   onDelete: (file: CloudFile) => void;
 }
+
+const nameOf = (email: string): string => email.split("@")[0];
+
+/* "user1, user2 and 3 others" — the list stays one line at any length */
+const summarise = (emails: string[]): string => {
+  const names = emails.map(nameOf);
+
+  if (names.length <= 2) return names.join(" and ");
+
+  return `${names.slice(0, 2).join(", ")} and ${names.length - 2} other${
+    names.length - 2 === 1 ? "" : "s"
+  }`;
+};
 
 const FileCard = ({
   file,
@@ -33,6 +47,7 @@ const FileCard = ({
   isOwner,
   query = "",
   downloading = false,
+  deleting = false,
   onOpen,
   onDownload,
   onEdit,
@@ -44,6 +59,12 @@ const FileCard = ({
   const [confirming, setConfirming] = useState(false);
 
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const processing = file.status === "processing";
+  const sharedWith = file.sharedWith ?? [];
+
+  /* a card mid-delete stops responding but stays put until the API answers */
+  const inert = deleting || processing;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -71,6 +92,11 @@ const FileCard = ({
     };
   }, [menuOpen]);
 
+  /* the menu is meaningless on a row that isn't in the catalogue yet */
+  useEffect(() => {
+    if (processing) setMenuOpen(false);
+  }, [processing]);
+
   const closeMenu = () => {
     setMenuOpen(false);
     setConfirming(false);
@@ -89,13 +115,14 @@ const FileCard = ({
         aria-label={`Actions for ${file.title}`}
         aria-haspopup="menu"
         aria-expanded={menuOpen}
+        disabled={inert}
         onClick={(event) => {
           event.stopPropagation();
           setMenuOpen((open) => !open);
           setConfirming(false);
         }}
       >
-        <Icon name="more" size={17} strokeWidth={2.4} />
+        <Icon name="more" size={18} strokeWidth={2.4} />
       </button>
 
       {menuOpen && (
@@ -106,7 +133,7 @@ const FileCard = ({
         >
           {confirming ? (
             <div className="file-menu-confirm">
-              <strong>Delete this file?</strong>
+              <strong>Move to trash?</strong>
 
               <p>It'll be gone for good — there's no undo.</p>
 
@@ -158,8 +185,8 @@ const FileCard = ({
                     role="menuitem"
                     onClick={run(() => onEdit(file))}
                   >
-                    <Icon name="edit" size={16} />
-                    Edit details
+                    <Icon name="users" size={16} />
+                    Share &amp; edit
                   </button>
 
                   <hr className="divider" />
@@ -182,26 +209,67 @@ const FileCard = ({
     </div>
   );
 
+  /*
+    The two halves of the API's answer. Owners see who they gave it to;
+    everyone else sees who gave it to them.
+  */
+  const sharing = isOwner ? (
+    sharedWith.length > 0 ? (
+      <div className="file-share" title={sharedWith.join(", ")}>
+        <span className="file-share-faces" aria-hidden="true">
+          {sharedWith.slice(0, 3).map((email) => (
+            <span key={email} className="file-face">
+              {initialsOf(nameOf(email), email.slice(0, 2).toUpperCase())}
+            </span>
+          ))}
+        </span>
+
+        <span className="file-share-text">
+          Shared with <strong>{summarise(sharedWith)}</strong>
+        </span>
+      </div>
+    ) : (
+      <div className="file-share file-share--private">
+        <span className="file-face file-face--muted" aria-hidden="true">
+          <Icon name="lock" size={12} strokeWidth={1.9} />
+        </span>
+
+        <span className="file-share-text">Private — only you</span>
+      </div>
+    )
+  ) : (
+    <div className="file-share" title={file.sharedBy?.email}>
+      <span className="file-face file-face--owner" aria-hidden="true">
+        {initialsOf(file.sharedBy?.name ?? file.sharedBy?.email)}
+      </span>
+
+      <span className="file-share-text">
+        Shared by{" "}
+        <strong>{file.sharedBy?.name || file.sharedBy?.email || "someone"}</strong>
+      </span>
+    </div>
+  );
+
   const badges = (
     <>
-      {file.publicAccess && (
-        <span className="badge badge--accent">
-          <Icon name="globe" size={12} strokeWidth={1.8} />
-          Public
-        </span>
-      )}
-
-      {!isOwner && (
-        <span className="badge">
-          <Icon name="users" size={12} strokeWidth={1.8} />
-          Shared
-        </span>
-      )}
-
-      {file.status !== "COMPLETED" && (
+      {processing && (
         <span className="badge badge--warn">
-          <Icon name="clock" size={12} strokeWidth={1.8} />
-          {file.status.toLowerCase()}
+          <Icon name="spinner" size={12} strokeWidth={2} className="spin" />
+          Processing
+        </span>
+      )}
+
+      {file.status === "failed" && (
+        <span className="badge badge--danger">
+          <Icon name="alert" size={12} strokeWidth={1.9} />
+          Failed
+        </span>
+      )}
+
+      {isOwner && sharedWith.length > 0 && (
+        <span className="badge badge--accent">
+          <Icon name="users" size={12} strokeWidth={1.9} />
+          {sharedWith.length}
         </span>
       )}
     </>
@@ -219,9 +287,14 @@ const FileCard = ({
     },
   };
 
+  const className = (base: string) =>
+    `${base}${processing ? ` ${base}--processing` : ""}${
+      deleting ? ` ${base}--deleting` : ""
+    }`;
+
   if (view === "list") {
     return (
-      <div className="file-row" {...openOnActivate}>
+      <div className={className("file-row")} {...openOnActivate}>
         <span
           className="file-glyph file-glyph--sm"
           style={{ "--tone": kind.tone } as CSSProperties}
@@ -234,9 +307,7 @@ const FileCard = ({
             <Highlight text={file.title} query={query} />
           </h3>
 
-          <span className="file-row-name">
-            <Highlight text={file.fileName} query={query} />
-          </span>
+          <span className="file-row-sub">{sharing}</span>
         </div>
 
         <div className="file-row-badges">{badges}</div>
@@ -246,22 +317,28 @@ const FileCard = ({
         <span className="file-row-date">{formatRelative(file.createdAt)}</span>
 
         <div className="file-row-actions">
-          <button
-            type="button"
-            className="btn btn--ghost btn--icon"
-            aria-label={`Download ${file.title}`}
-            disabled={downloading}
-            onClick={(event) => {
-              event.stopPropagation();
-              onDownload(file);
-            }}
-          >
-            <Icon
-              name={downloading ? "spinner" : "download"}
-              size={16}
-              className={downloading ? "spin" : undefined}
-            />
-          </button>
+          {deleting ? (
+            <span className="file-busy" aria-label="Deleting">
+              <Icon name="spinner" size={16} strokeWidth={2} className="spin" />
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="btn btn--ghost btn--icon btn--sm"
+              aria-label={`Download ${file.title}`}
+              disabled={downloading || processing}
+              onClick={(event) => {
+                event.stopPropagation();
+                onDownload(file);
+              }}
+            >
+              <Icon
+                name={downloading ? "spinner" : "download"}
+                size={16}
+                className={downloading ? "spin" : undefined}
+              />
+            </button>
+          )}
 
           {menu}
         </div>
@@ -270,42 +347,56 @@ const FileCard = ({
   }
 
   return (
-    <article className="file-card" {...openOnActivate}>
-      <div className="file-card-top">
+    <article className={className("file-card")} {...openOnActivate}>
+      <div className="file-card-head">
         <span
-          className="file-glyph"
+          className="file-glyph file-glyph--sm"
           style={{ "--tone": kind.tone } as CSSProperties}
         >
-          <Icon name={kind.icon} size={20} />
+          <Icon name={kind.icon} size={16} />
         </span>
 
-        {menu}
+        <h3 className="file-card-title">
+          <Highlight text={file.title} query={query} />
+        </h3>
+
+        {deleting ? (
+          <span className="file-busy" aria-label="Deleting">
+            <Icon name="spinner" size={16} strokeWidth={2} className="spin" />
+          </span>
+        ) : (
+          menu
+        )}
       </div>
 
-      <h3 className="file-card-title">
-        <Highlight text={file.title} query={query} />
-      </h3>
+      {/* Drive's card is mostly preview; ours carries the file's kind */}
+      <div
+        className="file-card-preview"
+        style={{ "--tone": kind.tone } as CSSProperties}
+      >
+        <Icon name={kind.icon} size={34} strokeWidth={1.2} />
 
-      <p className="file-card-desc">
-        {file.description ? (
-          <Highlight text={file.description} query={query} />
-        ) : (
-          <span className="file-card-desc--empty">No description</span>
-        )}
-      </p>
-
-      <div className="file-card-badges">{badges}</div>
-
-      <footer className="file-card-foot">
         <span className="file-card-ext mono">{kind.label}</span>
 
-        <span className="dot" />
+        {processing && (
+          <span className="file-card-scan" aria-hidden="true" />
+        )}
+      </div>
 
-        <span className="num">{formatBytes(file.size)}</span>
+      {file.description && (
+        <p className="file-card-desc">
+          <Highlight text={file.description} query={query} />
+        </p>
+      )}
 
-        <span className="dot" />
+      {sharing}
 
-        <span>{formatRelative(file.createdAt)}</span>
+      <footer className="file-card-foot">
+        <div className="file-card-badges">{badges}</div>
+
+        <span className="file-card-meta num">
+          {formatBytes(file.size)} · {formatRelative(file.createdAt)}
+        </span>
       </footer>
     </article>
   );

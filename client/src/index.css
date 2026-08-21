@@ -3,110 +3,111 @@
    ========================================================= */
 
 :root {
-  /* surfaces */
-  --bg: #fbfbfc;
-  --bg-subtle: #f4f5f7;
+  /* surfaces — Drive's cool near-white shell over white sheets */
+  --bg: #f8fafd;
+  --bg-subtle: #f0f4f9;
   --surface: #ffffff;
-  --surface-2: #f7f8fa;
-  --surface-3: #eef0f4;
-  --overlay: rgba(16, 18, 24, 0.44);
+  --surface-2: #f0f4f9;
+  --surface-3: #e3e8ef;
+  --overlay: rgba(32, 33, 36, 0.5);
 
   /* lines */
-  --line: #e5e7ec;
-  --line-strong: #d3d7e0;
+  --line: #e3e6ea;
+  --line-strong: #dadce0;
 
   /* type */
-  --ink: #14161b;
-  --ink-2: #565d6b;
-  --ink-3: #878e9c;
+  --ink: #1f1f1f;
+  --ink-2: #444746;
+  --ink-3: #747775;
 
   /* brand */
-  --accent: #4f46e5;
-  --accent-hover: #4338ca;
+  --accent: #0b57d0;
+  --accent-hover: #0842a0;
   --accent-ink: #ffffff;
-  --accent-soft: rgba(79, 70, 229, 0.09);
-  --accent-line: rgba(79, 70, 229, 0.28);
+  --accent-soft: #e8f0fe;
+  --accent-line: #a8c7fa;
 
   /* status */
-  --danger: #cf2f22;
-  --danger-soft: rgba(207, 47, 34, 0.09);
-  --success: #0a7a4b;
-  --success-soft: rgba(10, 122, 75, 0.1);
-  --warn: #a25a06;
-  --warn-soft: rgba(162, 90, 6, 0.1);
+  --danger: #b3261e;
+  --danger-soft: #fce8e6;
+  --success: #146c2e;
+  --success-soft: #e6f4ea;
+  --warn: #9a6700;
+  --warn-soft: #fef7e0;
 
   /* file-kind hues */
-  --k-doc: #3b6fd4;
-  --k-image: #128a6f;
-  --k-video: #b0427a;
-  --k-audio: #8a5cd0;
-  --k-archive: #a2680d;
-  --k-code: #4b5563;
+  --k-doc: #1a73e8;
+  --k-image: #12805c;
+  --k-video: #c5221f;
+  --k-audio: #8430ce;
+  --k-archive: #b06000;
+  --k-code: #5f6368;
 
-  /* elevation */
-  --shadow-1: 0 1px 2px rgba(16, 18, 24, 0.05);
-  --shadow-2: 0 1px 2px rgba(16, 18, 24, 0.05), 0 6px 16px -6px rgba(16, 18, 24, 0.12);
-  --shadow-3: 0 12px 32px -12px rgba(16, 18, 24, 0.28), 0 2px 6px rgba(16, 18, 24, 0.06);
+  /* elevation — Drive keeps shadows very low and very soft */
+  --shadow-1: 0 1px 2px rgba(60, 64, 67, 0.1);
+  --shadow-2: 0 1px 2px rgba(60, 64, 67, 0.16), 0 1px 3px 1px rgba(60, 64, 67, 0.08);
+  --shadow-3: 0 4px 8px 3px rgba(60, 64, 67, 0.13), 0 1px 3px rgba(60, 64, 67, 0.2);
 
-  /* geometry */
-  --r-xs: 5px;
-  --r-sm: 7px;
-  --r-md: 10px;
-  --r-lg: 14px;
-  --r-xl: 20px;
+  /* geometry — generous radii are half of what reads as "Google" */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 28px;
   --r-full: 999px;
 
-  --nav-h: 60px;
-  --page-w: 1180px;
+  --nav-h: 64px;
+  --rail-w: 232px;
+  --page-w: 1440px;
 
-  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
-  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: "Google Sans", "Product Sans", Roboto, ui-sans-serif, system-ui,
+    -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "Roboto Mono", "SF Mono", Menlo, Consolas, monospace;
 
-  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease: cubic-bezier(0.2, 0, 0, 1);
 
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0b0c10;
-    --bg-subtle: #0f1116;
-    --surface: #14161c;
-    --surface-2: #1a1d24;
-    --surface-3: #222630;
-    --overlay: rgba(4, 5, 8, 0.66);
+    --bg: #1b1b1b;
+    --bg-subtle: #131314;
+    --surface: #1e1f20;
+    --surface-2: #282a2c;
+    --surface-3: #333537;
+    --overlay: rgba(0, 0, 0, 0.62);
 
-    --line: #262a33;
-    --line-strong: #363c48;
+    --line: #2e2f31;
+    --line-strong: #444746;
 
-    --ink: #eceef3;
-    --ink-2: #9aa2b1;
-    --ink-3: #6d7484;
+    --ink: #e3e3e3;
+    --ink-2: #c4c7c5;
+    --ink-3: #8e918f;
 
-    --accent: #7f78ff;
-    --accent-hover: #948eff;
-    --accent-ink: #0b0c10;
-    --accent-soft: rgba(127, 120, 255, 0.14);
-    --accent-line: rgba(127, 120, 255, 0.36);
+    --accent: #a8c7fa;
+    --accent-hover: #c2ddff;
+    --accent-ink: #062e6f;
+    --accent-soft: #0842a0;
+    --accent-line: #4c8df6;
 
-    --danger: #f2645a;
-    --danger-soft: rgba(242, 100, 90, 0.14);
-    --success: #3ec98d;
-    --success-soft: rgba(62, 201, 141, 0.13);
-    --warn: #e0a45c;
-    --warn-soft: rgba(224, 164, 92, 0.13);
+    --danger: #f2b8b5;
+    --danger-soft: #601410;
+    --success: #6dd58c;
+    --success-soft: #0f3f1c;
+    --warn: #f5c26b;
+    --warn-soft: #4a3400;
 
-    --k-doc: #6b9dfa;
-    --k-image: #35c2a1;
-    --k-video: #e874ac;
-    --k-audio: #ab8bf0;
-    --k-archive: #d7a252;
-    --k-code: #9aa2b1;
+    --k-doc: #8ab4f8;
+    --k-image: #5bd1a5;
+    --k-video: #f28b82;
+    --k-audio: #d7aefb;
+    --k-archive: #fdd663;
+    --k-code: #c4c7c5;
 
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 20px -8px rgba(0, 0, 0, 0.6);
-    --shadow-3: 0 16px 40px -14px rgba(0, 0, 0, 0.75), 0 2px 6px rgba(0, 0, 0, 0.5);
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px 1px rgba(0, 0, 0, 0.35);
+    --shadow-3: 0 4px 8px 3px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.6);
 
     color-scheme: dark;
   }
@@ -131,8 +132,8 @@ body {
   min-height: 100svh;
   background: var(--bg);
   color: var(--ink-2);
-  font: 400 15px/1.55 var(--sans);
-  letter-spacing: -0.006em;
+  font: 400 14px/1.5 var(--sans);
+  letter-spacing: 0.01em;
   font-synthesis-weight: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -145,26 +146,27 @@ body {
   flex-direction: column;
 }
 
+/* Google Sans sits at 400–500 for headings; heavy weights read wrong */
 h1,
 h2,
 h3,
 h4 {
   margin: 0;
   color: var(--ink);
-  font-weight: 600;
-  letter-spacing: -0.022em;
-  line-height: 1.2;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.25;
 }
 
 h1 {
-  font-size: 30px;
+  font-size: 28px;
 }
 h2 {
   font-size: 20px;
 }
 h3 {
   font-size: 16px;
-  letter-spacing: -0.012em;
+  font-weight: 500;
 }
 
 p {
@@ -260,40 +262,61 @@ svg {
    buttons
    ========================================================= */
 
+/*
+  Google's buttons are full pills with a wide hit area and no shadow
+  until they're the primary action.
+*/
+
 .btn {
   --btn-bg: var(--surface);
-  --btn-ink: var(--ink);
+  --btn-ink: var(--accent);
   --btn-line: var(--line-strong);
 
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  height: 38px;
-  padding: 0 14px;
+  gap: 8px;
+  height: 40px;
+  padding: 0 20px;
   border: 1px solid var(--btn-line);
-  border-radius: var(--r-md);
+  border-radius: var(--r-full);
   background: var(--btn-bg);
   color: var(--btn-ink);
   font-size: 14px;
   font-weight: 500;
-  letter-spacing: -0.005em;
+  letter-spacing: 0.01em;
   cursor: pointer;
   white-space: nowrap;
+  overflow: hidden;
   transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease),
-    color 0.15s var(--ease), transform 0.06s var(--ease), box-shadow 0.15s var(--ease);
+    color 0.15s var(--ease), box-shadow 0.15s var(--ease);
 }
 
-.btn:hover:not(:disabled) {
-  background: var(--surface-2);
+/* the state layer — a tinted wash on hover, the way Material does it */
+.btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 0.15s var(--ease);
 }
 
-.btn:active:not(:disabled) {
-  transform: translateY(0.5px);
+.btn:hover:not(:disabled)::before {
+  opacity: 0.08;
+}
+
+.btn:active:not(:disabled)::before {
+  opacity: 0.12;
+}
+
+.btn > * {
+  position: relative;
 }
 
 .btn:disabled {
-  opacity: 0.52;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
@@ -301,10 +324,15 @@ svg {
   --btn-bg: var(--accent);
   --btn-ink: var(--accent-ink);
   --btn-line: transparent;
-  box-shadow: var(--shadow-1);
 }
 .btn--primary:hover:not(:disabled) {
-  background: var(--accent-hover);
+  box-shadow: var(--shadow-2);
+}
+
+.btn--tonal {
+  --btn-bg: var(--accent-soft);
+  --btn-ink: var(--accent);
+  --btn-line: transparent;
 }
 
 .btn--ghost {
@@ -313,7 +341,6 @@ svg {
   --btn-line: transparent;
 }
 .btn--ghost:hover:not(:disabled) {
-  background: var(--surface-3);
   color: var(--ink);
 }
 
@@ -322,20 +349,18 @@ svg {
   --btn-line: var(--line-strong);
 }
 .btn--danger:hover:not(:disabled) {
-  background: var(--danger-soft);
   border-color: var(--danger);
 }
 
 .btn--sm {
   height: 32px;
-  padding: 0 11px;
+  padding: 0 14px;
   font-size: 13px;
-  border-radius: var(--r-sm);
 }
 
 .btn--lg {
-  height: 44px;
-  padding: 0 20px;
+  height: 48px;
+  padding: 0 24px;
   font-size: 15px;
 }
 
@@ -344,9 +369,15 @@ svg {
 }
 
 .btn--icon {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   padding: 0;
+  border-radius: var(--r-full);
+}
+
+.btn--icon.btn--sm {
+  width: 32px;
+  height: 32px;
 }
 
 /* =========================================================
@@ -375,9 +406,9 @@ svg {
 .textarea,
 .select {
   width: 100%;
-  padding: 9px 12px;
+  padding: 11px 14px;
   border: 1px solid var(--line-strong);
-  border-radius: var(--r-md);
+  border-radius: var(--r-sm);
   background: var(--surface);
   color: var(--ink);
   font-size: 14.5px;
@@ -406,7 +437,7 @@ svg {
 .select:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .input:disabled,
@@ -542,6 +573,44 @@ svg {
   outline-offset: 2px;
 }
 
+/* sharing block — shared by the upload form and the file modal */
+
+.share-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+
+.share-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  animation: share-in 0.18s var(--ease);
+}
+
+@keyframes share-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.switch > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.switch strong {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
 /* =========================================================
    surfaces & bits
    ========================================================= */
@@ -556,14 +625,14 @@ svg {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 21px;
-  padding: 0 8px;
+  height: 22px;
+  padding: 0 9px;
   border-radius: var(--r-full);
-  background: var(--surface-3);
+  background: var(--surface-2);
   color: var(--ink-2);
   font-size: 11.5px;
-  font-weight: 550;
-  letter-spacing: -0.002em;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   white-space: nowrap;
 }
 
@@ -578,6 +647,10 @@ svg {
 .badge--warn {
   background: var(--warn-soft);
   color: var(--warn);
+}
+.badge--danger {
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 .alert {

@@ -5,17 +5,17 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 20px;
-  padding: 34px 0 22px;
+  padding: 28px 0 22px;
 }
 
 .page-head h1 {
-  margin: 6px 0 5px;
+  margin: 0 0 6px;
 }
 
 .page-head p {
-  font-size: 14.5px;
+  font-size: 14px;
   color: var(--ink-2);
-  max-width: 58ch;
+  max-width: 60ch;
 }
 
 .page-head-actions {
@@ -41,8 +41,7 @@
   align-items: center;
   text-align: center;
   gap: 6px;
-  padding: 72px 24px;
-  border: 1px dashed var(--line-strong);
+  padding: 80px 24px;
   border-radius: var(--r-lg);
   background: var(--surface-2);
 }
@@ -50,18 +49,17 @@
 .state-icon {
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 46px;
-  margin-bottom: 8px;
-  border-radius: var(--r-md);
-  border: 1px solid var(--line);
+  width: 64px;
+  height: 64px;
+  margin-bottom: 12px;
+  border-radius: var(--r-full);
   background: var(--surface);
   color: var(--ink-3);
-  box-shadow: var(--shadow-1);
 }
 
 .state h2 {
-  font-size: 17px;
+  font-size: 18px;
+  font-weight: 500;
 }
 
 .state p {

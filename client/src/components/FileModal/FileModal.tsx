@@ -5,13 +5,14 @@ import {
   type FormEvent,
 } from "react";
 
-import { deleteFile, getFileDetail, updateFile } from "../../services/api";
+import { ApiError, deleteFile, getFileDetail, updateFile } from "../../services/api";
 import { describeFile, isPreviewable } from "../../lib/fileKind";
-import { formatBytes, formatDateTime } from "../../lib/format";
+import { formatBytes, formatDateTime, initialsOf } from "../../lib/format";
 import type { CloudFile } from "../../types/file";
 
 import Icon from "../Icon/Icon";
 import Loader from "../Loader/Loader";
+import ShareEmails from "../ShareEmails/ShareEmails";
 import { useToast } from "../Toast/useToast";
 
 import "./FileModal.css";
@@ -20,6 +21,7 @@ interface FileModalProps {
   file: CloudFile;
   isOwner: boolean;
   startInEdit?: boolean;
+  ownEmail?: string;
   onClose: () => void;
   onUpdated: (file: CloudFile) => void;
   onDeleted: (fileId: string) => void;
@@ -29,6 +31,7 @@ const FileModal = ({
   file,
   isOwner,
   startInEdit = false,
+  ownEmail,
   onClose,
   onUpdated,
   onDeleted,
@@ -42,7 +45,10 @@ const FileModal = ({
 
   const [title, setTitle] = useState(file.title);
   const [description, setDescription] = useState(file.description);
-  const [publicAccess, setPublicAccess] = useState(file.publicAccess);
+
+  const [sharing, setSharing] = useState((file.sharedWith ?? []).length > 0);
+  const [emails, setEmails] = useState<string[]>(file.sharedWith ?? []);
+  const [shareError, setShareError] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -51,16 +57,35 @@ const FileModal = ({
   const [downloadUrl, setDownloadUrl] = useState("");
   const [linkError, setLinkError] = useState("");
 
+  /*
+    The row exists before the object is usable, so the detail call can
+    legitimately answer 409. That isn't an error to apologise for — it
+    just means "check back in a moment".
+  */
+  const [processing, setProcessing] = useState(
+    file.status === "processing" || Boolean(file.pending)
+  );
+
   /* one signed URL per open — powers both preview and download */
   useEffect(() => {
+    if (file.pending) return;
+
     let active = true;
 
     getFileDetail(file.id)
       .then((detail) => {
-        if (active) setDownloadUrl(detail.downloadUrl);
+        if (!active) return;
+
+        setDownloadUrl(detail.downloadUrl);
+        setProcessing(false);
       })
       .catch((cause: unknown) => {
         if (!active) return;
+
+        if (cause instanceof ApiError && cause.status === 409) {
+          setProcessing(true);
+          return;
+        }
 
         setLinkError(
           cause instanceof Error
@@ -72,7 +97,7 @@ const FileModal = ({
     return () => {
       active = false;
     };
-  }, [file.id]);
+  }, [file.id, file.pending]);
 
   /* escape to close, and keep the page behind from scrolling */
   useEffect(() => {
@@ -91,6 +116,15 @@ const FileModal = ({
     };
   }, [onClose]);
 
+  const resetForm = () => {
+    setTitle(file.title);
+    setDescription(file.description);
+    setEmails(file.sharedWith ?? []);
+    setSharing((file.sharedWith ?? []).length > 0);
+    setShareError("");
+    setError("");
+  };
+
   const handleSave = async (event: FormEvent) => {
     event.preventDefault();
 
@@ -99,14 +133,23 @@ const FileModal = ({
       return;
     }
 
+    /* sharing with nobody isn't sharing — say so rather than saving it */
+    if (sharing && emails.length === 0) {
+      setShareError("Add at least one person, or turn sharing off.");
+      return;
+    }
+
+    const nextEmails = sharing ? emails : [];
+
     try {
       setSaving(true);
       setError("");
+      setShareError("");
 
       const updated = await updateFile(file.id, {
         title: title.trim(),
         description: description.trim(),
-        publicAccess,
+        share_to_emails: nextEmails,
       });
 
       /*
@@ -120,7 +163,7 @@ const FileModal = ({
         userId: file.userId,
         title: title.trim(),
         description: description.trim(),
-        publicAccess,
+        sharedWith: nextEmails,
       });
 
       setEditing(false);
@@ -139,6 +182,7 @@ const FileModal = ({
       setDeleting(true);
       setError("");
 
+      /* the modal stays open, spinner and all, until the API confirms */
       await deleteFile(file.id);
 
       onDeleted(file.id);
@@ -162,6 +206,8 @@ const FileModal = ({
     }
   };
 
+  const sharedWith = file.sharedWith ?? [];
+
   const meta = [
     { label: "File name", value: file.fileName },
     {
@@ -173,11 +219,24 @@ const FileModal = ({
     { label: "Size", value: formatBytes(file.size) },
     { label: "Added", value: formatDateTime(file.createdAt) },
     { label: "Last changed", value: formatDateTime(file.updatedAt) },
-    {
-      label: "Who can see it",
-      value: file.publicAccess ? "Everyone" : "Only you",
-    },
   ];
+
+  const processingNotice = (
+    <div className="modal-processing">
+      <span className="modal-processing-icon">
+        <Icon name="spinner" size={22} strokeWidth={2} className="spin" />
+      </span>
+
+      <div>
+        <strong>This file is still being processed</strong>
+
+        <p>
+          We're scanning it and filing it away. Give it a few seconds — it'll
+          be ready to preview and download shortly.
+        </p>
+      </div>
+    </div>
+  );
 
   return (
     <div
@@ -211,12 +270,14 @@ const FileModal = ({
             aria-label="Close"
             onClick={onClose}
           >
-            <Icon name="x" size={18} />
+            <Icon name="x" size={20} />
           </button>
         </header>
 
         <div className="modal-body">
-          {isPreviewable(file.mimeType) && (
+          {processing && processingNotice}
+
+          {!processing && isPreviewable(file.mimeType) && (
             <div className="modal-preview">
               {!downloadUrl && !linkError && (
                 <Loader text="Loading preview" />
@@ -282,35 +343,53 @@ const FileModal = ({
                 />
               </div>
 
-              <label className="switch modal-visibility">
-                <input
-                  type="checkbox"
-                  checked={publicAccess}
-                  disabled={saving}
-                  onChange={(event) => setPublicAccess(event.target.checked)}
-                />
+              <div className="share-panel">
+                <label className="switch">
+                  <input
+                    type="checkbox"
+                    checked={sharing}
+                    disabled={saving}
+                    onChange={(event) => {
+                      setSharing(event.target.checked);
+                      setShareError("");
+                    }}
+                  />
 
-                <span className="switch-track" />
+                  <span className="switch-track" />
 
-                <span>
-                  <strong>Let everyone see this</strong>
-                  <span className="hint">
-                    Other people will find it under Shared with me.
+                  <span>
+                    <strong>Share with specific people</strong>
+
+                    <span className="hint">
+                      {sharing
+                        ? "They'll find it under Shared with me."
+                        : "Only you can see this file."}
+                    </span>
                   </span>
-                </span>
-              </label>
+                </label>
+
+                {sharing && (
+                  <ShareEmails
+                    emails={emails}
+                    onChange={(next) => {
+                      setEmails(next);
+                      setShareError("");
+                    }}
+                    disabled={saving}
+                    ownEmail={ownEmail}
+                    error={shareError}
+                  />
+                )}
+              </div>
 
               <div className="modal-actions">
                 <button
                   type="button"
-                  className="btn"
+                  className="btn btn--ghost"
                   disabled={saving}
                   onClick={() => {
                     setEditing(false);
-                    setTitle(file.title);
-                    setDescription(file.description);
-                    setPublicAccess(file.publicAccess);
-                    setError("");
+                    resetForm();
                   }}
                 >
                   Cancel
@@ -330,6 +409,57 @@ const FileModal = ({
               {file.description && (
                 <p className="modal-description">{file.description}</p>
               )}
+
+              {/* who can see it — the same split the card shows */}
+              <section className="modal-people">
+                <h3>{isOwner ? "People with access" : "Shared with you by"}</h3>
+
+                {isOwner ? (
+                  sharedWith.length > 0 ? (
+                    <ul className="people-list">
+                      {sharedWith.map((email) => (
+                        <li key={email}>
+                          <span className="people-avatar">
+                            {initialsOf(
+                              email.split("@")[0],
+                              email.slice(0, 2).toUpperCase()
+                            )}
+                          </span>
+
+                          <span className="people-email">{email}</span>
+
+                          <span className="badge">Viewer</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="people-empty">
+                      <Icon name="lock" size={15} />
+                      Private — nobody else can open this file.
+                    </p>
+                  )
+                ) : (
+                  <ul className="people-list">
+                    <li>
+                      <span className="people-avatar people-avatar--owner">
+                        {initialsOf(
+                          file.sharedBy?.name ?? file.sharedBy?.email
+                        )}
+                      </span>
+
+                      <span className="people-email">
+                        {file.sharedBy?.name || file.sharedBy?.email}
+
+                        {file.sharedBy?.name && file.sharedBy?.email && (
+                          <small>{file.sharedBy.email}</small>
+                        )}
+                      </span>
+
+                      <span className="badge">Owner</span>
+                    </li>
+                  </ul>
+                )}
+              </section>
 
               <dl className="modal-meta">
                 {meta.map((row) => (
@@ -353,7 +483,7 @@ const FileModal = ({
 
                 <button
                   type="button"
-                  className="btn"
+                  className="btn btn--ghost"
                   disabled={deleting}
                   onClick={() => setConfirmingDelete(false)}
                 >
@@ -375,6 +505,7 @@ const FileModal = ({
                   <button
                     type="button"
                     className="btn btn--danger"
+                    disabled={processing}
                     onClick={() => setConfirmingDelete(true)}
                   >
                     <Icon name="trash" size={16} />
@@ -385,7 +516,7 @@ const FileModal = ({
                 <div className="modal-footer-right">
                   <button
                     type="button"
-                    className="btn"
+                    className="btn btn--ghost"
                     disabled={!downloadUrl}
                     onClick={handleCopyLink}
                   >
@@ -397,10 +528,11 @@ const FileModal = ({
                     <button
                       type="button"
                       className="btn"
+                      disabled={processing}
                       onClick={() => setEditing(true)}
                     >
-                      <Icon name="edit" size={16} />
-                      Edit
+                      <Icon name="users" size={16} />
+                      Share
                     </button>
                   )}
 

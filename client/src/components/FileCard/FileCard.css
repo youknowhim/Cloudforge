@@ -8,16 +8,15 @@
   width: 40px;
   height: 40px;
   flex: none;
-  border-radius: var(--r-md);
-  border: 1px solid color-mix(in srgb, var(--tone) 24%, transparent);
-  background: color-mix(in srgb, var(--tone) 11%, transparent);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--tone) 13%, transparent);
   color: var(--tone);
 }
 
 .file-glyph--sm {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--r-sm);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-xs);
 }
 
 .dot {
@@ -28,10 +27,82 @@
 }
 
 .hl {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
   color: inherit;
   border-radius: 3px;
   padding: 0 1px;
+}
+
+.file-busy {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  color: var(--ink-3);
+}
+
+/* ---------------------------------------------------------
+   sharing line — the card's whole point
+   --------------------------------------------------------- */
+
+.file-share {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+.file-share-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-share-text strong {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.file-share--private .file-share-text {
+  color: var(--ink-3);
+}
+
+/* overlapping avatars, Drive-style */
+.file-share-faces {
+  display: flex;
+  flex: none;
+}
+
+.file-share-faces .file-face + .file-face {
+  margin-left: -7px;
+}
+
+.file-face {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-full);
+  border: 1.5px solid var(--surface);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.file-face--owner {
+  background: var(--k-image);
+  color: #fff;
+}
+
+.file-face--muted {
+  background: var(--surface-3);
+  color: var(--ink-3);
 }
 
 /* ---------------------------------------------------------
@@ -42,20 +113,21 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  padding: 16px;
-  border: 1px solid var(--line);
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid transparent;
   border-radius: var(--r-lg);
-  background: var(--surface);
+  background: var(--surface-2);
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease),
-    transform 0.15s var(--ease);
+  transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease),
+    box-shadow 0.15s var(--ease);
 }
 
 .file-card:hover {
-  border-color: var(--line-strong);
+  background: var(--surface);
+  border-color: var(--line);
   box-shadow: var(--shadow-2);
-  transform: translateY(-1px);
 }
 
 .file-card:focus-visible {
@@ -63,25 +135,72 @@
   outline-offset: 2px;
 }
 
-.file-card-top {
+.file-card-head {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 13px;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
 }
 
 .file-card-title {
-  font-size: 14.5px;
-  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--ink);
-  margin-bottom: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.file-card-preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  height: 128px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: color-mix(in srgb, var(--tone) 82%, transparent);
+  overflow: hidden;
+}
+
+.file-card:hover .file-card-preview {
+  background: var(--bg-subtle);
+}
+
+.file-card-ext {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+
+/* a slow sweep while the lambda is still working on the file */
+.file-card-scan {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--accent) 16%, transparent) 50%,
+    transparent 70%
+  );
+  background-size: 250% 100%;
+  animation: scan 1.6s var(--ease) infinite;
+}
+
+@keyframes scan {
+  from {
+    background-position: 130% 0;
+  }
+  to {
+    background-position: -30% 0;
+  }
+}
+
 .file-card-desc {
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.45;
   color: var(--ink-2);
   display: -webkit-box;
@@ -89,37 +208,27 @@
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: 38px;
 }
 
-.file-card-desc--empty {
+.file-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
   color: var(--ink-3);
-  font-style: italic;
 }
 
 .file-card-badges {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  margin-top: 12px;
-  min-height: 21px;
 }
 
-.file-card-foot {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-  font-size: 12px;
-  color: var(--ink-3);
-}
-
-.file-card-ext {
-  font-weight: 600;
-  color: var(--ink-2);
-  letter-spacing: 0.02em;
+.file-card-meta {
+  white-space: nowrap;
 }
 
 /* ---------------------------------------------------------
@@ -128,17 +237,13 @@
 
 .file-row {
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) auto 84px 96px 76px;
+  grid-template-columns: 28px minmax(0, 1fr) auto 92px 108px 80px;
   align-items: center;
-  gap: 14px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--line);
+  gap: 16px;
+  padding: 9px 16px;
+  border-radius: var(--r-full);
   cursor: pointer;
   transition: background-color 0.12s var(--ease);
-}
-
-.file-row:last-child {
-  border-bottom: 0;
 }
 
 .file-row:hover {
@@ -156,20 +261,16 @@
 
 .file-row-main h3 {
   font-size: 14px;
-  font-weight: 550;
+  font-weight: 500;
   color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.file-row-name {
+.file-row-sub {
   display: block;
-  font-size: 12.5px;
-  color: var(--ink-3);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  margin-top: 2px;
 }
 
 .file-row-badges {
@@ -181,7 +282,6 @@
 .file-row-date {
   font-size: 12.5px;
   color: var(--ink-2);
-  text-align: right;
 }
 
 .file-row-actions {
@@ -191,19 +291,32 @@
   gap: 2px;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   .file-row {
-    grid-template-columns: 32px minmax(0, 1fr) 76px;
+    grid-template-columns: 28px minmax(0, 1fr) 80px;
+    gap: 12px;
   }
 
   .file-row-badges,
-  .file-row-date {
-    display: none;
-  }
-
+  .file-row-date,
   .file-row-size {
     display: none;
   }
+}
+
+/* ---------------------------------------------------------
+   transient states
+   --------------------------------------------------------- */
+
+.file-card--processing,
+.file-row--processing {
+  cursor: default;
+}
+
+.file-card--deleting,
+.file-row--deleting {
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 /* ---------------------------------------------------------
@@ -218,34 +331,40 @@
 .file-menu-trigger {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-full);
   background: transparent;
   color: var(--ink-3);
   cursor: pointer;
   transition: background-color 0.12s var(--ease), color 0.12s var(--ease);
 }
 
-.file-menu-trigger:hover {
+.file-menu-trigger:hover:not(:disabled) {
   background: var(--surface-3);
   color: var(--ink);
 }
 
+.file-menu-trigger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .file-menu {
-  min-width: 194px;
+  min-width: 200px;
   cursor: default;
+  z-index: 5;
 }
 
 .file-menu-confirm {
-  padding: 10px;
-  width: 232px;
+  padding: 12px;
+  width: 244px;
 }
 
 .file-menu-confirm strong {
   display: block;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--ink);
   margin-bottom: 4px;
 }
@@ -259,9 +378,10 @@
 .file-menu-confirm-actions {
   display: flex;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 14px;
 }
 
 .file-menu-confirm-actions .btn {
   flex: 1;
+  padding: 0 12px;
 }

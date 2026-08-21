@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 import { useAuth } from "../../auth/useAuth";
 
@@ -11,6 +11,7 @@ import { useToast } from "../../components/Toast/useToast";
 
 import { extensionOf } from "../../lib/fileKind";
 import { formatBytes } from "../../lib/format";
+import { reconcilePendingUploads } from "../../lib/pendingUploads";
 import { useDebounced } from "../../lib/useDebounced";
 
 import { deleteFile, getFileDetail, getFiles } from "../../services/api";
@@ -23,13 +24,16 @@ type SortKey = "recent" | "oldest" | "name" | "size";
 type View = "grid" | "list";
 
 const SORTS: { value: SortKey; label: string }[] = [
-  { value: "recent", label: "Newest first" },
+  { value: "recent", label: "Last modified" },
   { value: "oldest", label: "Oldest first" },
   { value: "name", label: "Name A–Z" },
   { value: "size", label: "Largest first" },
 ];
 
 const VIEW_KEY = "cloudforge.files.view";
+
+/* how often to look for rows the processing lambda has just written */
+const PENDING_POLL = 4000;
 
 const matches = (file: CloudFile, query: string): boolean => {
   if (!query) return true;
@@ -40,6 +44,9 @@ const matches = (file: CloudFile, query: string): boolean => {
     file.fileName,
     extensionOf(file.fileName),
     file.mimeType,
+    ...(file.sharedWith ?? []),
+    file.sharedBy?.name ?? "",
+    file.sharedBy?.email ?? "",
   ]
     .join(" ")
     .toLowerCase()
@@ -51,6 +58,9 @@ const sortFiles = (files: CloudFile[], sort: SortKey): CloudFile[] => {
     file.createdAt ? new Date(file.createdAt).getTime() : 0;
 
   return [...files].sort((a, b) => {
+    /* whatever the sort, a file still landing belongs at the top */
+    if (Boolean(a.pending) !== Boolean(b.pending)) return a.pending ? -1 : 1;
+
     switch (sort) {
       case "oldest":
         return time(a) - time(b);
@@ -67,9 +77,9 @@ const sortFiles = (files: CloudFile[], sort: SortKey): CloudFile[] => {
 const Files = () => {
   const { user } = useAuth();
   const { notify } = useToast();
-  const location = useLocation();
 
   const [files, setFiles] = useState<CloudFile[]>([]);
+  const [pending, setPending] = useState<CloudFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -91,13 +101,10 @@ const Files = () => {
 
   const [downloadingId, setDownloadingId] = useState("");
 
-  const searchRef = useRef<HTMLInputElement>(null);
+  /* ids the API hasn't confirmed deleted yet — they stay on screen */
+  const [deletingIds, setDeletingIds] = useState<string[]>([]);
 
-  /* Upload redirects here; the catalogue row only appears once the
-     processing lambda has written it, so poll briefly. */
-  const justUploaded = Boolean(
-    (location.state as { uploaded?: boolean } | null)?.uploaded
-  );
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async (background = false) => {
     try {
@@ -106,7 +113,12 @@ const Files = () => {
 
       setError("");
 
-      setFiles(await getFiles());
+      const result = await getFiles();
+
+      setFiles(result);
+
+      /* placeholders whose real row has landed retire themselves */
+      setPending(reconcilePendingUploads(result));
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Couldn't load your files."
@@ -117,37 +129,22 @@ const Files = () => {
     }
   }, []);
 
-  /* first fetch — state only changes once the request settles */
   useEffect(() => {
-    let active = true;
+    void load();
+  }, [load]);
 
-    getFiles()
-      .then((result) => active && setFiles(result))
-      .catch(
-        (cause: unknown) =>
-          active &&
-          setError(
-            cause instanceof Error
-              ? cause.message
-              : "Couldn't load your files."
-          )
-      )
-      .finally(() => active && setLoading(false));
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
+  /*
+    Poll only while something is actually in flight — no placeholder,
+    no polling. This replaces the old "still being tidied away" banner,
+    which stayed on screen long after the file had arrived.
+  */
   useEffect(() => {
-    if (!justUploaded) return;
+    if (pending.length === 0) return;
 
-    const timers = [4000, 9000, 15000].map((delay) =>
-      window.setTimeout(() => load(true), delay)
-    );
+    const timer = window.setInterval(() => void load(true), PENDING_POLL);
 
-    return () => timers.forEach(window.clearTimeout);
-  }, [justUploaded, load]);
+    return () => window.clearInterval(timer);
+  }, [pending.length, load]);
 
   useEffect(() => localStorage.setItem(VIEW_KEY, view), [view]);
 
@@ -171,12 +168,12 @@ const Files = () => {
   }, []);
 
   const isOwner = useCallback(
-    (file: CloudFile) => !file.userId || file.userId === user?.id,
-    [user?.id]
+    (file: CloudFile) => !file.sharedBy,
+    []
   );
 
   const { mine, shared } = useMemo(() => {
-    const mineFiles: CloudFile[] = [];
+    const mineFiles: CloudFile[] = [...pending];
     const sharedFiles: CloudFile[] = [];
 
     for (const file of files) {
@@ -184,10 +181,9 @@ const Files = () => {
     }
 
     return { mine: mineFiles, shared: sharedFiles };
-  }, [files, isOwner]);
+  }, [files, pending, isOwner]);
 
-  /* Search runs over both buckets at once so the counts on the
-     inactive tab stay honest. */
+  /* Search runs over both buckets so the inactive tab's count stays honest */
   const results = useMemo(
     () => ({
       mine: sortFiles(mine.filter((file) => matches(file, query)), sort),
@@ -204,7 +200,8 @@ const Files = () => {
     () => ({
       count: mine.length,
       bytes: mine.reduce((total, file) => total + file.size, 0),
-      publicCount: mine.filter((file) => file.publicAccess).length,
+      sharedCount: mine.filter((file) => (file.sharedWith ?? []).length > 0)
+        .length,
     }),
     [mine]
   );
@@ -235,21 +232,27 @@ const Files = () => {
     }
   };
 
+  /*
+    No optimistic removal: the card stays put, dimmed and spinning,
+    until the DELETE actually comes back 200. A failed delete used to
+    make a file blink out and reappear.
+  */
   const handleDelete = async (file: CloudFile) => {
-    /* optimistic: the row goes now, and comes back if the API says no */
-    setFiles((current) => current.filter((item) => item.id !== file.id));
+    setDeletingIds((current) => [...current, file.id]);
 
     try {
       await deleteFile(file.id);
 
+      setFiles((current) => current.filter((item) => item.id !== file.id));
+
       notify(`"${file.title}" was deleted.`, "success");
     } catch (cause) {
-      setFiles((current) => [file, ...current]);
-
       notify(
         cause instanceof Error ? cause.message : "Couldn't delete that file.",
         "error"
       );
+    } finally {
+      setDeletingIds((current) => current.filter((id) => id !== file.id));
     }
   };
 
@@ -278,9 +281,7 @@ const Files = () => {
       <div className="shell">
         <header className="page-head">
           <div>
-            <p className="eyebrow">Library</p>
-
-            <h1>Files</h1>
+            <h1>{scope === "mine" ? "My files" : "Shared with me"}</h1>
 
             <p>
               Everything you've added, plus what other people have shared with
@@ -291,21 +292,21 @@ const Files = () => {
           <div className="page-head-actions">
             <button
               type="button"
-              className="btn"
+              className="btn btn--ghost btn--icon"
+              aria-label="Refresh"
               disabled={refreshing || loading}
-              onClick={() => load(true)}
+              onClick={() => void load(true)}
             >
               <Icon
                 name="refresh"
-                size={16}
+                size={18}
                 className={refreshing ? "spin" : undefined}
               />
-              Refresh
             </button>
 
             <Link to="/upload" className="btn btn--primary">
-              <Icon name="upload" size={16} />
-              Upload
+              <Icon name="plus" size={17} strokeWidth={2} />
+              New
             </Link>
           </div>
         </header>
@@ -323,7 +324,7 @@ const Files = () => {
 
           <div className="stat">
             <span className="stat-label">Shared by you</span>
-            <strong className="num">{stats.publicCount}</strong>
+            <strong className="num">{stats.sharedCount}</strong>
           </div>
 
           <div className="stat">
@@ -331,16 +332,6 @@ const Files = () => {
             <strong className="num">{shared.length}</strong>
           </div>
         </section>
-
-        {justUploaded && (
-          <div className="alert files-notice">
-            <Icon name="clock" size={16} />
-            <span>
-              Your file is still being tidied away. It'll appear here in a
-              moment — we're checking for you.
-            </span>
-          </div>
-        )}
 
         <div className="files-toolbar">
           <div className="segmented" role="tablist" aria-label="File scope">
@@ -366,14 +357,14 @@ const Files = () => {
 
           <div className="input-affix files-search">
             <span className="input-affix-icon">
-              <Icon name="search" size={16} />
+              <Icon name="search" size={18} />
             </span>
 
             <input
               ref={searchRef}
               type="search"
               className="input input--with-icon"
-              placeholder="Search titles, descriptions, file names…"
+              placeholder="Search in CloudForge"
               value={rawQuery}
               aria-label="Search files"
               onChange={(event) => setRawQuery(event.target.value)}
@@ -410,7 +401,7 @@ const Files = () => {
                   aria-pressed={view === option}
                   onClick={() => setView(option)}
                 >
-                  <Icon name={option} size={16} />
+                  <Icon name={option} size={17} />
                 </button>
               ))}
             </div>
@@ -419,26 +410,25 @@ const Files = () => {
 
         {loading ? (
           <div className="files-grid" aria-hidden="true">
-            {Array.from({ length: 6 }).map((_, index) => (
+            {Array.from({ length: 8 }).map((_, index) => (
               <div key={index} className="file-skeleton">
-                <div className="skeleton" style={{ width: 40, height: 40 }} />
-                <div className="skeleton" style={{ width: "62%", height: 13 }} />
-                <div className="skeleton" style={{ width: "88%", height: 11 }} />
-                <div className="skeleton" style={{ width: "40%", height: 11 }} />
+                <div className="skeleton" style={{ width: "58%", height: 14 }} />
+                <div className="skeleton" style={{ width: "100%", height: 128 }} />
+                <div className="skeleton" style={{ width: "72%", height: 11 }} />
               </div>
             ))}
           </div>
         ) : error ? (
           <div className="state">
             <span className="state-icon">
-              <Icon name="alert" size={20} />
+              <Icon name="alert" size={22} />
             </span>
 
             <h2>We couldn't load your files</h2>
 
             <p>{error}</p>
 
-            <button type="button" className="btn" onClick={() => load()}>
+            <button type="button" className="btn" onClick={() => void load()}>
               <Icon name="refresh" size={16} />
               Try again
             </button>
@@ -446,7 +436,7 @@ const Files = () => {
         ) : visible.length === 0 ? (
           <div className="state">
             <span className="state-icon">
-              <Icon name={query ? "search" : "folder"} size={20} />
+              <Icon name={query ? "search" : "folder"} size={22} />
             </span>
 
             <h2>
@@ -506,7 +496,7 @@ const Files = () => {
               </button>
             )}
 
-            <div className={view === "grid" ? "files-grid" : "files-list card"}>
+            <div className={view === "grid" ? "files-grid" : "files-list"}>
               {visible.map((file) => (
                 <FileCard
                   key={file.id}
@@ -515,6 +505,7 @@ const Files = () => {
                   query={query}
                   isOwner={isOwner(file)}
                   downloading={downloadingId === file.id}
+                  deleting={deletingIds.includes(file.id)}
                   onOpen={(target) => setActive({ file: target, editing: false })}
                   onEdit={(target) => setActive({ file: target, editing: true })}
                   onDownload={handleDownload}
@@ -543,6 +534,7 @@ const Files = () => {
           file={active.file}
           isOwner={isOwner(active.file)}
           startInEdit={active.editing}
+          ownEmail={user?.email}
           onClose={() => setActive(null)}
           onUpdated={handleUpdated}
           onDeleted={handleDeleted}

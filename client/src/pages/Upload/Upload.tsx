@@ -7,12 +7,16 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { useAuth } from "../../auth/useAuth";
+
 import Icon from "../../components/Icon/Icon";
 import Loader from "../../components/Loader/Loader";
+import ShareEmails from "../../components/ShareEmails/ShareEmails";
 import { useToast } from "../../components/Toast/useToast";
 
 import { describeFile } from "../../lib/fileKind";
 import { baseName, formatBytes } from "../../lib/format";
+import { addPendingUpload, safeFileName } from "../../lib/pendingUploads";
 
 import { createFile, uploadToS3 } from "../../services/api";
 
@@ -41,13 +45,17 @@ const STEPS: { stage: Stage; label: string; detail: string }[] = [
 const Upload = () => {
   const navigate = useNavigate();
   const { notify } = useToast();
+  const { user } = useAuth();
 
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [publicAccess, setPublicAccess] = useState(false);
+
+  const [sharing, setSharing] = useState(false);
+  const [emails, setEmails] = useState<string[]>([]);
+  const [shareError, setShareError] = useState("");
 
   const [stage, setStage] = useState<Stage>("idle");
   const [progress, setProgress] = useState(0);
@@ -80,7 +88,9 @@ const Upload = () => {
     setFile(null);
     setTitle("");
     setDescription("");
-    setPublicAccess(false);
+    setSharing(false);
+    setEmails([]);
+    setShareError("");
     setProgress(0);
     setStage("idle");
     setError("");
@@ -103,17 +113,31 @@ const Upload = () => {
       return;
     }
 
+    /*
+      Sharing with an empty list is a contradiction. Rather than send it,
+      say what's missing and put the toggle back where it belongs.
+    */
+    if (sharing && emails.length === 0) {
+      setSharing(false);
+      setShareError(
+        "An email address is required to share — sharing has been turned back off."
+      );
+      return;
+    }
+
+    const share_to_emails = sharing ? emails : [];
+
     try {
       setStage("signing");
 
-      const { uploadUrl } = await createFile({
+      const { fileId, uploadUrl } = await createFile({
         fileName: file.name,
         title: title.trim(),
         description: description.trim(),
         /* browsers leave `type` empty for unknown extensions */
         mimeType: file.type || "application/octet-stream",
         size: file.size,
-        publicAccess,
+        share_to_emails,
       });
 
       if (!uploadUrl) {
@@ -127,9 +151,31 @@ const Upload = () => {
       await uploadToS3(uploadUrl, file, setProgress);
 
       setStage("done");
-      notify("Upload complete.", "success");
 
-      navigate("/files", { state: { uploaded: true } });
+      /*
+        Show the card immediately. The processing lambda writes the real
+        row a few seconds later, and the library swaps this placeholder
+        out the moment it appears.
+      */
+      addPendingUpload(
+        {
+          id: fileId,
+          userId: user?.id ?? "",
+          fileName: file.name,
+          title: title.trim(),
+          description: description.trim(),
+          mimeType: file.type || "application/octet-stream",
+          size: file.size,
+          sharedWith: share_to_emails,
+          status: "processing",
+          createdAt: new Date().toISOString(),
+        },
+        `${fileId}-${safeFileName(file.name)}`
+      );
+
+      notify("Upload complete — we're processing it now.", "success");
+
+      navigate("/files");
     } catch (cause) {
       setStage("idle");
       setProgress(0);
@@ -147,13 +193,11 @@ const Upload = () => {
       <div className="shell upload-shell">
         <header className="page-head">
           <div>
-            <p className="eyebrow">New upload</p>
-
             <h1>Add a file</h1>
 
             <p>
-              Pick a file, give it a name you'll recognise later, and choose
-              whether anyone else can see it.
+              Pick a file, give it a name you'll recognise later, and choose who
+              else can see it.
             </p>
           </div>
         </header>
@@ -215,14 +259,14 @@ const Upload = () => {
                         reset();
                       }}
                     >
-                      <Icon name="x" size={16} />
+                      <Icon name="x" size={18} />
                     </button>
                   )}
                 </div>
               ) : (
                 <>
                   <span className="dropzone-icon">
-                    <Icon name="upload" size={20} />
+                    <Icon name="upload" size={24} strokeWidth={1.5} />
                   </span>
 
                   <strong>Drop a file here, or click to browse</strong>
@@ -263,28 +307,62 @@ const Upload = () => {
               />
             </div>
 
-            <label className="switch upload-visibility">
-              <input
-                type="checkbox"
-                checked={publicAccess}
-                disabled={busy}
-                onChange={(event) => setPublicAccess(event.target.checked)}
-              />
+            {/* --------- sharing --------- */}
 
-              <span className="switch-track" />
+            <div className="share-panel">
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={sharing}
+                  disabled={busy}
+                  onChange={(event) => {
+                    setSharing(event.target.checked);
+                    setShareError("");
+                  }}
+                />
 
-              <span>
-                <strong>
-                  {publicAccess ? "Anyone can see this" : "Only you can see this"}
-                </strong>
+                <span className="switch-track" />
 
-                <span className="hint">
-                  {publicAccess
-                    ? "Everyone else will find it under Shared with me."
-                    : "You can share it later — nothing is set in stone."}
+                <span>
+                  <strong>
+                    {sharing
+                      ? "Share with specific people"
+                      : "Only you can see this"}
+                  </strong>
+
+                  <span className="hint">
+                    {sharing
+                      ? "Add the people who should get it — they'll find it under Shared with me."
+                      : "You can share it later — nothing is set in stone."}
+                  </span>
                 </span>
-              </span>
-            </label>
+              </label>
+
+              {sharing && (
+                <div className="share-panel-body">
+                  <span className="label">Add people</span>
+
+                  <ShareEmails
+                    emails={emails}
+                    onChange={(next) => {
+                      setEmails(next);
+                      setShareError("");
+                    }}
+                    disabled={busy}
+                    ownEmail={user?.email}
+                    error={shareError}
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              {!sharing && shareError && (
+                <p className="share-status share-status--bad">
+                  <Icon name="alert" size={13} />
+                  {shareError}
+                </p>
+              )}
+            </div>
 
             {error && (
               <div className="alert alert--error" role="alert">
@@ -325,7 +403,7 @@ const Upload = () => {
             <div className="upload-actions">
               <button
                 type="button"
-                className="btn"
+                className="btn btn--ghost"
                 disabled={busy || (!file && !title && !description)}
                 onClick={reset}
               >
@@ -390,8 +468,9 @@ const Upload = () => {
               </span>
 
               <p>
-                Your file turns up in your library a few seconds after it
-                finishes sending. You don't have to wait on this page.
+                Your file shows up in the library straight away with a
+                <strong> Processing </strong>
+                marker, and becomes downloadable a few seconds later.
               </p>
             </div>
           </aside>

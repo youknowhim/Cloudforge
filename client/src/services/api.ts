@@ -1,8 +1,10 @@
 import type {
   CloudFile,
   CreateFileResponse,
+  EmailCheckResult,
   FileDetail,
   FileMetadata,
+  FileOwner,
   FileStatus,
   FileUpdate,
 } from "../types/file";
@@ -84,7 +86,12 @@ const request = async <T>(
       ...options,
       headers: requestHeaders,
     });
-  } catch {
+  } catch (cause) {
+    /* a superseded request isn't a failure — let callers ignore it */
+    if (cause instanceof DOMException && cause.name === "AbortError") {
+      throw cause;
+    }
+
     throw new ApiError(
       "We can't reach CloudForge right now. Check your connection and try again.",
       0
@@ -135,6 +142,45 @@ const pick = <T>(raw: RawFile, ...keys: string[]): T | undefined => {
   return undefined;
 };
 
+/*
+  The API answers with `sharedWith` for files you own and `sharedBy`
+  for files someone shared with you — never both. That distinction is
+  what the card renders, so preserve it rather than flattening it.
+*/
+const normalizeShared = (raw: RawFile): string[] => {
+  const value = pick<unknown>(raw, "sharedWith", "share_to_emails");
+
+  if (Array.isArray(value)) {
+    return value.map(String).filter(Boolean);
+  }
+
+  /* jsonb can arrive as a string if a driver doesn't parse it */
+  if (typeof value === "string") {
+    try {
+      const parsed: unknown = JSON.parse(value);
+
+      return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+};
+
+const normalizeOwner = (raw: RawFile): FileOwner | undefined => {
+  const value = pick<unknown>(raw, "sharedBy", "shared_by");
+
+  if (!value || typeof value !== "object") return undefined;
+
+  const owner = value as { name?: unknown; email?: unknown };
+
+  return {
+    name: owner.name ? String(owner.name) : undefined,
+    email: owner.email ? String(owner.email) : undefined,
+  };
+};
+
 const normalizeFile = (raw: RawFile): CloudFile => ({
   id: String(pick<string>(raw, "id", "fileId") ?? ""),
   userId: String(pick<string>(raw, "userId", "user_id") ?? ""),
@@ -148,8 +194,10 @@ const normalizeFile = (raw: RawFile): CloudFile => ({
 
   s3Key: pick<string>(raw, "s3Key", "s3_key"),
 
-  publicAccess: Boolean(pick<boolean>(raw, "publicAccess", "public_access")),
-  status: (pick<FileStatus>(raw, "status") ?? "COMPLETED") as FileStatus,
+  sharedWith: normalizeShared(raw),
+  sharedBy: normalizeOwner(raw),
+
+  status: (pick<FileStatus>(raw, "status") ?? "clean") as FileStatus,
 
   createdAt: pick<string>(raw, "createdAt", "created_at"),
   updatedAt: pick<string>(raw, "updatedAt", "updated_at"),
@@ -219,6 +267,23 @@ export const getFileDetail = async (fileId: string): Promise<FileDetail> => {
     downloadUrl: payload.downloadUrl,
     expiresIn: payload.expiresIn,
   };
+};
+
+/*
+  Existence check for the share box. Sent as a GET with the address in
+  the query string, and debounced by the caller so a fast typist
+  doesn't fire one request per keystroke.
+*/
+export const checkUserEmail = async (
+  email: string,
+  signal?: AbortSignal
+): Promise<boolean> => {
+  const payload = await request<EmailCheckResult>(
+    `/files/check-email?email=${encodeURIComponent(email.trim().toLowerCase())}`,
+    { signal }
+  );
+
+  return Boolean(payload?.exists);
 };
 
 export const createFile = (

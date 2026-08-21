@@ -1,0 +1,156 @@
+.share-emails {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* the whole box behaves as one field: chips wrap, the input fills the rest */
+.share-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 46px;
+  padding: 7px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  cursor: text;
+  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+
+.share-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.share-box--error {
+  border-color: var(--danger);
+}
+
+.share-box--error:focus-within {
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
+
+/* chip ----------------------------------------------------- */
+
+.share-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  height: 32px;
+  padding: 0 4px 0 4px;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.share-chip-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-full);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.share-chip-email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-chip-remove {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-right: 2px;
+  border: 0;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: background-color 0.12s var(--ease), color 0.12s var(--ease);
+}
+
+.share-chip-remove:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+
+.share-chip-remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* input + inline add --------------------------------------- */
+
+.share-input {
+  flex: 1;
+  min-width: 160px;
+  height: 32px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14.5px;
+}
+
+.share-input:focus {
+  outline: none;
+}
+
+.share-input::placeholder {
+  color: var(--ink-3);
+}
+
+.share-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.share-add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* status line ---------------------------------------------- */
+
+.share-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.share-status--ok {
+  color: var(--success);
+}
+
+.share-status--bad {
+  color: var(--danger);
+}
+
+.share-status--wait {
+  color: var(--ink-3);
+}
