@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import {
+  checkUserEmail,
   createFile,
   getFiles,
   getFileById,
@@ -10,12 +11,18 @@ import {
 
 import { authMiddleware } from "../middlewares/auth.middleware";
 
+
 const router = Router();
 
 /*
   All file APIs require authentication.
 */
 
+router.get(
+  "/check-email",
+  authMiddleware,
+  checkUserEmail
+);
 router.post(
   "/",
   authMiddleware,
