@@ -579,6 +579,8 @@ export async function removeFile(
       [id, userId]
     );
 
+    await redis.del(`files:${id}:user:${userId}`);
+    await redis.del(`files:user:${userId}`);
 
     return res.status(200).json({
       message: "File deleted successfully",
