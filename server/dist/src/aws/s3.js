@@ -18,11 +18,16 @@ async function generateUploadUrl(key, mimeType, metadata) {
         Bucket: bucket,
         Key: key,
         ContentType: mimeType,
+        /*
+          S3 user metadata is a flat string map, so the recipient list
+          travels as a comma-separated string and is split again by the
+          processing lambda.
+        */
         Metadata: {
             "file-name": metadata.fileName,
             title: metadata.title,
             description: metadata.description,
-            "public-access": String(metadata.publicAccess),
+            "share-to-emails": (metadata.share_to_emails ?? []).join(","),
         },
     });
     return (0, s3_request_presigner_1.getSignedUrl)(s3, command, {

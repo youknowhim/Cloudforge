@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.checkUserEmail = checkUserEmail;
 exports.createFile = createFile;
 exports.getFiles = getFiles;
 exports.getFileById = getFileById;
@@ -12,10 +13,35 @@ const crypto_1 = require("crypto");
 const postgres_1 = require("../database/postgres");
 const redis_1 = __importDefault(require("../cache/redis"));
 const s3_1 = require("../aws/s3");
+async function checkUserEmail(req, res) {
+    try {
+        const email = String(req.query.email || "");
+        if (!email) {
+            return res.status(400).json({
+                message: "Email is required",
+            });
+        }
+        const result = await postgres_1.pool.query(`
+      SELECT 1
+      FROM users
+      WHERE email = $1
+      LIMIT 1
+      `, [email]);
+        return res.status(200).json({
+            exists: result.rows.length > 0,
+        });
+    }
+    catch (error) {
+        console.error("Check user email error:", error);
+        return res.status(500).json({
+            message: "Failed to check email",
+        });
+    }
+}
 async function createFile(req, res) {
     try {
         const userId = req.user.id;
-        const { fileName, title, description = "", mimeType, size, publicAccess = false, } = req.body;
+        const { fileName, title, description = "", share_to_emails = [], mimeType, size, } = req.body;
         /* ---------- Validation ---------- */
         if (!fileName) {
             return res.status(400).json({
@@ -37,11 +63,6 @@ async function createFile(req, res) {
                 message: "Valid file size is required",
             });
         }
-        if (typeof publicAccess !== "boolean") {
-            return res.status(400).json({
-                message: "publicAccess must be true or false",
-            });
-        }
         /* ---------- Generate unique file ID ---------- */
         const fileId = (0, crypto_1.randomUUID)();
         /* ---------- Sanitize filename ---------- */
@@ -53,7 +74,7 @@ async function createFile(req, res) {
             fileName: String(fileName),
             title: String(title),
             description: String(description),
-            publicAccess,
+            share_to_emails: share_to_emails,
         });
         /* ---------- Return upload information ---------- */
         return res.status(201).json({
@@ -68,7 +89,7 @@ async function createFile(req, res) {
                 description,
                 mimeType,
                 size,
-                publicAccess,
+                share_to_emails,
             },
         });
     }
@@ -91,6 +112,7 @@ async function createFile(req, res) {
 async function getFiles(req, res) {
     try {
         const userId = req.user.id;
+        const email = req.user.email;
         const cacheKey = `files:user:${userId}`;
         // 1. Check Redis
         const cachedFiles = await redis_1.default.get(cacheKey);
@@ -100,33 +122,87 @@ async function getFiles(req, res) {
             });
         }
         const result = await postgres_1.pool.query(`
-      SELECT
-        id,
-        user_id,
-        file_name,
-        title,
-        description,
-        mime_type,
-        size,
-        s3_key,
-        public_access,
-        status,
-        created_at,
-        updated_at
-      FROM files
-      WHERE status = 'clean'
-        AND (
-          user_id = $1
-          OR public_access = TRUE
-        )
-      ORDER BY created_at DESC
-      `, [userId]);
-        // 3. Store result in Redis
-        await redis_1.default.set(cacheKey, result.rows, {
+  SELECT
+    f.id,
+    f.user_id,
+    f.file_name,
+    f.title,
+    f.description,
+    f.mime_type,
+    f.size,
+    f.s3_key,
+    f.share_to_emails,
+    f.status,
+    f.created_at,
+    f.updated_at,
+
+    u.name AS owner_name,
+    u.email AS owner_email
+
+  FROM files f
+
+  JOIN users u
+    ON u.id = f.user_id
+
+  WHERE (
+      f.status = 'clean'
+      AND (
+        f.user_id = $1
+        OR f.share_to_emails @> $2::jsonb
+      )
+    )
+    /*
+      Owners also see their own rejected uploads, so a file that was
+      turned away (too large, failed a check) says so instead of
+      silently never showing up.
+    */
+    OR (
+      f.status = 'failed'
+      AND f.user_id = $1
+    )
+
+  ORDER BY f.created_at DESC
+  `, 
+        /* jsonb containment needs the email as a JSON scalar: "a@b.com" */
+        [userId, JSON.stringify(email)]);
+        const files = result.rows;
+        const responseFiles = files.map((file) => {
+            const isOwner = String(file.user_id) === String(userId);
+            if (isOwner) {
+                return {
+                    id: file.id,
+                    fileName: file.file_name,
+                    title: file.title,
+                    description: file.description,
+                    mimeType: file.mime_type,
+                    size: file.size,
+                    sharedWith: file.share_to_emails || [],
+                    status: file.status,
+                    createdAt: file.created_at,
+                    updatedAt: file.updated_at,
+                };
+            }
+            return {
+                id: file.id,
+                fileName: file.file_name,
+                title: file.title,
+                description: file.description,
+                mimeType: file.mime_type,
+                size: file.size,
+                sharedBy: {
+                    name: file.owner_name,
+                    email: file.owner_email,
+                },
+                status: file.status,
+                createdAt: file.created_at,
+                updatedAt: file.updated_at,
+            };
+        });
+        await redis_1.default.set(cacheKey, responseFiles, {
             ex: 60,
         });
         return res.status(200).json({
-            files: result.rows,
+            files: responseFiles,
         });
     }
     catch (error) {
@@ -154,84 +230,85 @@ async function getFileById(req, res) {
         const cacheKey = `files:${id}:user:${userId}`;
         const cachedFile = await redis_1.default.get(cacheKey);
         if (cachedFile) {
-            // console.log("Redis HIT");
-            const file = cachedFile;
-            const downloadUrl = await (0, s3_1.generateDownloadUrl)(file.s3_key);
             return res.status(200).json({
-                file: {
-                    id: file.id,
-                    fileName: file.file_name,
-                    title: file.title,
-                    description: file.description,
-                    mimeType: file.mime_type,
-                    size: file.size,
-                    publicAccess: file.public_access,
-                    status: file.status,
-                    createdAt: file.created_at,
-                    updatedAt: file.updated_at,
-                },
-                downloadUrl,
+                file: cachedFile.responseFile,
+                downloadUrl: cachedFile.downloadUrl,
                 expiresIn: 900,
             });
         }
         // 2. Redis miss --> PostgreSQL
         const result = await postgres_1.pool.query(`
-        SELECT
-          id,
-          user_id,
-          file_name,
-          title,
-          description,
-          mime_type,
-          size,
-          s3_key,
-          public_access,
-          status,
-          created_at,
-          updated_at
-        FROM files
-        WHERE id = $1
-        `, [id]);
+  SELECT
+    f.id,
+    f.user_id,
+    f.file_name,
+    f.title,
+    f.description,
+    f.mime_type,
+    f.size,
+    f.s3_key,
+    f.share_to_emails,
+    f.status,
+    f.created_at,
+    f.updated_at,
+
+    u.name AS owner_name,
+    u.email AS owner_email
+
+  FROM files f
+
+  JOIN users u
+    ON u.id = f.user_id
+
+  WHERE f.id = $1
+    AND (
+      f.user_id = $2
+      OR f.share_to_emails @> $3::jsonb
+    )
+  `, [id, userId, JSON.stringify(req.user.email)]);
         if (result.rows.length === 0) {
             return res.status(404).json({
                 message: "File not found",
             });
         }
         const file = result.rows[0];
-        // 3. Authorization BEFORE caching/returning
         const isOwner = String(file.user_id) === String(userId);
-        if (!isOwner && !file.public_access) {
-            return res.status(403).json({
-                message: "You are not allowed to access this file",
-            });
-        }
+        const responseFile = {
+            id: file.id,
+            fileName: file.file_name,
+            title: file.title,
+            description: file.description,
+            mimeType: file.mime_type,
+            size: file.size,
+            status: file.status,
+            createdAt: file.created_at,
+            updatedAt: file.updated_at,
+            ...(isOwner
+                ? {
+                    sharedWith: file.share_to_emails || [],
+                }
+                : {
+                    sharedBy: {
+                        name: file.owner_name,
+                        email: file.owner_email,
+                    },
+                }),
+        };
         if (file.status !== "clean") {
             return res.status(409).json({
                 message: "File is still being processed",
                 status: file.status,
             });
         }
-        // 4. Cache metadata
-        await redis_1.default.set(cacheKey, file, {
-            ex: 60,
-        });
         // 5. Generate fresh signed URL
         const downloadUrl = await (0, s3_1.generateDownloadUrl)(file.s3_key);
+        // 4. Cache metadata
+        await redis_1.default.set(cacheKey, { responseFile, downloadUrl }, {
+            ex: 60,
+        });
         return res.status(200).json({
-            file: {
-                id: file.id,
-                fileName: file.file_name,
-                title: file.title,
-                description: file.description,
-                mimeType: file.mime_type,
-                size: file.size,
-                publicAccess: file.public_access,
-                status: file.status,
-                createdAt: file.created_at,
-                updatedAt: file.updated_at,
-            },
+            file: responseFile,
             downloadUrl,
-            expiresIn: 900,
         });
     }
     catch (error) {
@@ -247,13 +324,13 @@ async function getFileById(req, res) {
    Owner can change:
    - title
    - description
-   - publicAccess
+   - share_to_emails
    ========================================================= */
 async function updateFile(req, res) {
     try {
         const userId = req.user.id;
         const { id } = req.params;
-        const { title, description, publicAccess, } = req.body;
+        const { title, description, share_to_emails, } = req.body;
         /* ---------- Check ownership ---------- */
         const existing = await postgres_1.pool.query(`
       SELECT id
@@ -263,21 +340,15 @@ async function updateFile(req, res) {
       `, [id, userId]);
         if (existing.rows.length === 0) {
             return res.status(404).json({
-                message: "File not found",
+                message: "Either File not found or you are not the owner",
             });
         }
         /* ---------- Validate update ---------- */
         if (title === undefined &&
             description === undefined &&
-            publicAccess === undefined) {
+            share_to_emails === undefined) {
             return res.status(400).json({
                 message: "Nothing to update",
-            });
-        }
-        if (publicAccess !== undefined &&
-            typeof publicAccess !== "boolean") {
-            return res.status(400).json({
-                message: "publicAccess must be true or false",
             });
         }
         /* ---------- Update PostgreSQL ---------- */
@@ -286,7 +357,7 @@ async function updateFile(req, res) {
       SET
         title = COALESCE($1, title),
         description = COALESCE($2, description),
-        public_access = COALESCE($3, public_access),
+        share_to_emails = COALESCE($3::jsonb, share_to_emails),
         updated_at = NOW()
       WHERE id = $4
         AND user_id = $5
@@ -298,22 +369,37 @@ async function updateFile(req, res) {
         description,
         mime_type,
         size,
-        public_access,
+        share_to_emails,
         status,
         created_at,
         updated_at
       `, [
             title ?? null,
             description ?? null,
-            publicAccess ?? null,
+            /* jsonb column — send the array as JSON, not a PG array literal */
+            share_to_emails === undefined || share_to_emails === null
+                ? null
+                : JSON.stringify(share_to_emails),
             id,
             userId,
         ]);
         await redis_1.default.del(`files:${id}:user:${userId}`);
         await redis_1.default.del(`files:user:${userId}`);
+        const updated = result.rows[0];
         return res.status(200).json({
             message: "File updated successfully",
-            file: result.rows[0],
+            file: {
+                id: updated.id,
+                fileName: updated.file_name,
+                title: updated.title,
+                description: updated.description,
+                mimeType: updated.mime_type,
+                size: updated.size,
+                sharedWith: updated.share_to_emails || [],
+                status: updated.status,
+                createdAt: updated.created_at,
+                updatedAt: updated.updated_at,
+            },
         });
     }
     catch (error) {
@@ -357,6 +443,8 @@ async function removeFile(req, res) {
       WHERE id = $1
         AND user_id = $2
       `, [id, userId]);
+        await redis_1.default.del(`files:${id}:user:${userId}`);
+        await redis_1.default.del(`files:user:${userId}`);
         return res.status(200).json({
             message: "File deleted successfully",
         });
