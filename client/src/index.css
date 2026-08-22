@@ -522,6 +522,8 @@ svg {
 /* switch */
 
 .switch {
+  /* keeps the visually-hidden checkbox anchored to its own label */
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;

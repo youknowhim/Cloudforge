@@ -24,6 +24,15 @@ import "./Upload.css";
 
 type Stage = "idle" | "signing" | "transferring" | "done";
 
+/*
+  Must track MAX_FILE_SIZE in the processing lambda. Checking here means
+  an oversized file is refused in the form instead of being uploaded,
+  deleted server-side, and reported back as a failure minutes later.
+*/
+const MAX_UPLOAD_SIZE = Number(
+  import.meta.env.VITE_MAX_FILE_SIZE ?? 10 * 1024 * 1024
+);
+
 const STEPS: { stage: Stage; label: string; detail: string }[] = [
   {
     stage: "signing",
@@ -68,9 +77,17 @@ const Upload = () => {
     if (!selected) return;
 
     setFile(selected);
-    setError("");
     setProgress(0);
     setStage("idle");
+
+    /* say it now, at the moment they pick the file */
+    setError(
+      selected.size > MAX_UPLOAD_SIZE
+        ? `That file is ${formatBytes(selected.size)}. The limit is ${formatBytes(
+            MAX_UPLOAD_SIZE
+          )} — pick a smaller one.`
+        : ""
+    );
 
     if (!title.trim()) setTitle(baseName(selected.name));
   };
@@ -113,15 +130,30 @@ const Upload = () => {
       return;
     }
 
+    if (file.size > MAX_UPLOAD_SIZE) {
+      setError(
+        `That file is ${formatBytes(file.size)}. The limit is ${formatBytes(
+          MAX_UPLOAD_SIZE
+        )} — pick a smaller one.`
+      );
+      return;
+    }
+
     /*
-      Sharing with an empty list is a contradiction. Rather than send it,
-      say what's missing and put the toggle back where it belongs.
+      Sharing with an empty list is a contradiction, so the toggle goes
+      back off. The explanation is a toast rather than inline text —
+      inline, it outlived the state it described and sat there nagging
+      about a toggle that was already off.
     */
     if (sharing && emails.length === 0) {
       setSharing(false);
-      setShareError(
-        "An email address is required to share — sharing has been turned back off."
+      setShareError("");
+
+      notify(
+        "An email address is required to share, so sharing was turned back off.",
+        "error"
       );
+
       return;
     }
 
@@ -224,11 +256,17 @@ const Upload = () => {
                 inputRef.current?.click();
               }}
             >
+              {/*
+                The input lives inside the dropzone, so the click we
+                fire on it bubbles straight back into the dropzone's
+                own handler and re-opens the picker. Stop it here.
+              */}
               <input
                 ref={inputRef}
                 type="file"
                 hidden
                 disabled={busy}
+                onClick={(event) => event.stopPropagation()}
                 onChange={(event) => selectFile(event.target.files?.[0])}
               />
 
@@ -356,12 +394,6 @@ const Upload = () => {
                 </div>
               )}
 
-              {!sharing && shareError && (
-                <p className="share-status share-status--bad">
-                  <Icon name="alert" size={13} />
-                  {shareError}
-                </p>
-              )}
             </div>
 
             {error && (

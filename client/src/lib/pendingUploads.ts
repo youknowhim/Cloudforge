@@ -12,8 +12,16 @@ import type { CloudFile } from "../types/file";
 
 const KEY = "cloudforge.pending-uploads";
 
-/* long enough for the lambda, short enough that a failure clears itself */
-const TTL = 4 * 60_000;
+/*
+  How long a placeholder is allowed to say "Processing". The lambda
+  writes a row either way — clean or failed — so overrunning this means
+  something went wrong upstream, and the card says so rather than
+  spinning forever.
+*/
+const TTL = 90_000;
+
+/* after this we stop showing the stale card at all */
+const HARD_TTL = 30 * 60_000;
 
 interface StoredUpload {
   file: CloudFile;
@@ -37,7 +45,7 @@ const readRaw = (): StoredUpload[] => {
     const now = Date.now();
 
     return (parsed as StoredUpload[]).filter(
-      (entry) => entry?.file?.id && now - entry.addedAt < TTL
+      (entry) => entry?.file?.id && now - entry.addedAt < HARD_TTL
     );
   } catch {
     return [];
@@ -69,6 +77,10 @@ export const removePendingUpload = (fileId: string): void => {
 /*
   Drops placeholders whose real row has arrived, then returns the ones
   still waiting. Call it with every fresh server list.
+
+  A placeholder that outlives TTL is reported as failed rather than
+  left spinning: the row was never written, so waiting longer won't
+  help and the card needs to be dismissable.
 */
 export const reconcilePendingUploads = (
   serverFiles: CloudFile[]
@@ -79,9 +91,19 @@ export const reconcilePendingUploads = (
 
   writeRaw(waiting);
 
-  return waiting.map((entry) => ({
-    ...entry.file,
-    pending: true,
-    status: "processing" as const,
-  }));
+  const now = Date.now();
+
+  return waiting.map((entry) => {
+    const expired = now - entry.addedAt > TTL;
+
+    return {
+      ...entry.file,
+      pending: true,
+      status: expired ? ("failed" as const) : ("processing" as const),
+    };
+  });
 };
+
+/* true while at least one placeholder is still worth polling for */
+export const hasWaitingUploads = (files: CloudFile[]): boolean =>
+  files.some((file) => file.pending && file.status === "processing");

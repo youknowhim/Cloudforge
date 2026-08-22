@@ -105,6 +105,15 @@
   color: var(--ink-3);
 }
 
+.file-face--failed {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.file-share--failed .file-share-text {
+  color: var(--danger);
+}
+
 /* ---------------------------------------------------------
    grid card
    --------------------------------------------------------- */
@@ -308,9 +317,10 @@
    transient states
    --------------------------------------------------------- */
 
-.file-card--processing,
-.file-row--processing {
-  cursor: default;
+/* a processing card is still openable — that's where the wait is explained */
+.file-card--processing .file-card-title,
+.file-row--processing h3 {
+  color: var(--ink-2);
 }
 
 .file-card--deleting,

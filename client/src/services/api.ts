@@ -279,7 +279,7 @@ export const checkUserEmail = async (
   signal?: AbortSignal
 ): Promise<boolean> => {
   const payload = await request<EmailCheckResult>(
-    `/files/check-email?email=${encodeURIComponent(email.trim().toLowerCase())}`,
+    `/users/check-email?email=${encodeURIComponent(email.trim().toLowerCase())}`,
     { signal }
   );
 

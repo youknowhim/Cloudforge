@@ -63,12 +63,15 @@ const FileModal = ({
     just means "check back in a moment".
   */
   const [processing, setProcessing] = useState(
-    file.status === "processing" || Boolean(file.pending)
+    file.status === "processing"
   );
+
+  /* the object was rejected and deleted — there's nothing to fetch */
+  const failed = file.status === "failed";
 
   /* one signed URL per open — powers both preview and download */
   useEffect(() => {
-    if (file.pending) return;
+    if (file.pending || failed) return;
 
     let active = true;
 
@@ -97,7 +100,7 @@ const FileModal = ({
     return () => {
       active = false;
     };
-  }, [file.id, file.pending]);
+  }, [file.id, file.pending, failed]);
 
   /* escape to close, and keep the page behind from scrolling */
   useEffect(() => {
@@ -238,6 +241,24 @@ const FileModal = ({
     </div>
   );
 
+  const failedNotice = (
+    <div className="modal-processing modal-processing--failed">
+      <span className="modal-processing-icon">
+        <Icon name="alert" size={22} strokeWidth={1.9} />
+      </span>
+
+      <div>
+        <strong>This file wasn't stored</strong>
+
+        <p>
+          It didn't pass our checks — most often that means it was over the
+          size limit. Nothing was kept, so upload a smaller version to try
+          again.
+        </p>
+      </div>
+    </div>
+  );
+
   return (
     <div
       className="modal-overlay"
@@ -275,9 +296,11 @@ const FileModal = ({
         </header>
 
         <div className="modal-body">
-          {processing && processingNotice}
+          {failed && failedNotice}
 
-          {!processing && isPreviewable(file.mimeType) && (
+          {processing && !failed && processingNotice}
+
+          {!processing && !failed && isPreviewable(file.mimeType) && (
             <div className="modal-preview">
               {!downloadUrl && !linkError && (
                 <Loader text="Loading preview" />
@@ -501,7 +524,8 @@ const FileModal = ({
               </>
             ) : (
               <>
-                {isOwner && (
+                {/* a placeholder has no row to delete — dismiss it from the card */}
+                {isOwner && !file.pending && (
                   <button
                     type="button"
                     className="btn btn--danger"
@@ -524,7 +548,7 @@ const FileModal = ({
                     Copy link
                   </button>
 
-                  {isOwner && (
+                  {isOwner && !failed && (
                     <button
                       type="button"
                       className="btn"

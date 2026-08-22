@@ -61,6 +61,7 @@ const FileCard = ({
   const menuRef = useRef<HTMLDivElement>(null);
 
   const processing = file.status === "processing";
+  const failed = file.status === "failed";
   const sharedWith = file.sharedWith ?? [];
 
   /* a card mid-delete stops responding but stays put until the API answers */
@@ -133,9 +134,13 @@ const FileCard = ({
         >
           {confirming ? (
             <div className="file-menu-confirm">
-              <strong>Move to trash?</strong>
+              <strong>{file.pending ? "Dismiss this?" : "Move to trash?"}</strong>
 
-              <p>It'll be gone for good — there's no undo.</p>
+              <p>
+                {file.pending
+                  ? "It was never stored, so there's nothing to delete."
+                  : "It'll be gone for good — there's no undo."}
+              </p>
 
               <div className="file-menu-confirm-actions">
                 <button
@@ -151,7 +156,7 @@ const FileCard = ({
                   className="btn btn--sm btn--danger"
                   onClick={run(() => onDelete(file))}
                 >
-                  Delete
+                  {file.pending ? "Dismiss" : "Delete"}
                 </button>
               </div>
             </div>
@@ -197,8 +202,8 @@ const FileCard = ({
                     role="menuitem"
                     onClick={() => setConfirming(true)}
                   >
-                    <Icon name="trash" size={16} />
-                    Delete
+                    <Icon name={file.pending ? "x" : "trash"} size={16} />
+                    {file.pending ? "Dismiss" : "Delete"}
                   </button>
                 </>
               )}
@@ -213,7 +218,17 @@ const FileCard = ({
     The two halves of the API's answer. Owners see who they gave it to;
     everyone else sees who gave it to them.
   */
-  const sharing = isOwner ? (
+  const sharing = failed ? (
+    <div className="file-share file-share--failed">
+      <span className="file-face file-face--failed" aria-hidden="true">
+        <Icon name="alert" size={12} strokeWidth={2} />
+      </span>
+
+      <span className="file-share-text">
+        Wasn't stored — it didn't pass our checks
+      </span>
+    </div>
+  ) : isOwner ? (
     sharedWith.length > 0 ? (
       <div className="file-share" title={sharedWith.join(", ")}>
         <span className="file-share-faces" aria-hidden="true">

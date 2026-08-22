@@ -86,6 +86,14 @@
   background: var(--accent-soft);
 }
 
+.modal-processing--failed {
+  background: var(--danger-soft);
+}
+
+.modal-processing--failed .modal-processing-icon {
+  color: var(--danger);
+}
+
 .modal-processing-icon {
   display: grid;
   place-items: center;

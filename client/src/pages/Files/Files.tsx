@@ -11,7 +11,11 @@ import { useToast } from "../../components/Toast/useToast";
 
 import { extensionOf } from "../../lib/fileKind";
 import { formatBytes } from "../../lib/format";
-import { reconcilePendingUploads } from "../../lib/pendingUploads";
+import {
+  hasWaitingUploads,
+  reconcilePendingUploads,
+  removePendingUpload,
+} from "../../lib/pendingUploads";
 import { useDebounced } from "../../lib/useDebounced";
 
 import { deleteFile, getFileDetail, getFiles } from "../../services/api";
@@ -138,13 +142,15 @@ const Files = () => {
     no polling. This replaces the old "still being tidied away" banner,
     which stayed on screen long after the file had arrived.
   */
+  const waiting = hasWaitingUploads(pending);
+
   useEffect(() => {
-    if (pending.length === 0) return;
+    if (!waiting) return;
 
     const timer = window.setInterval(() => void load(true), PENDING_POLL);
 
     return () => window.clearInterval(timer);
-  }, [pending.length, load]);
+  }, [waiting, load]);
 
   useEffect(() => localStorage.setItem(VIEW_KEY, view), [view]);
 
@@ -238,6 +244,13 @@ const Files = () => {
     make a file blink out and reappear.
   */
   const handleDelete = async (file: CloudFile) => {
+    /* a placeholder has no row behind it — dismissing is all there is */
+    if (file.pending) {
+      removePendingUpload(file.id);
+      setPending((current) => current.filter((item) => item.id !== file.id));
+      return;
+    }
+
     setDeletingIds((current) => [...current, file.id]);
 
     try {
