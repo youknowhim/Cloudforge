@@ -190,6 +190,7 @@ const Upload = () => {
         out the moment it appears.
       */
       addPendingUpload(
+        user?.id ?? "",
         {
           id: fileId,
           userId: user?.id ?? "",

@@ -82,6 +82,9 @@ const Files = () => {
   const { user } = useAuth();
   const { notify } = useToast();
 
+  /* placeholders are scoped to this account — see lib/pendingUploads */
+  const userId = user?.id ?? "";
+
   const [files, setFiles] = useState<CloudFile[]>([]);
   const [pending, setPending] = useState<CloudFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -122,7 +125,7 @@ const Files = () => {
       setFiles(result);
 
       /* placeholders whose real row has landed retire themselves */
-      setPending(reconcilePendingUploads(result));
+      setPending(reconcilePendingUploads(userId, result));
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Couldn't load your files."
@@ -131,7 +134,7 @@ const Files = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     void load();
@@ -246,7 +249,7 @@ const Files = () => {
   const handleDelete = async (file: CloudFile) => {
     /* a placeholder has no row behind it — dismissing is all there is */
     if (file.pending) {
-      removePendingUpload(file.id);
+      removePendingUpload(userId, file.id);
       setPending((current) => current.filter((item) => item.id !== file.id));
       return;
     }

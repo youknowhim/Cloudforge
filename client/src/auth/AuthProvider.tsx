@@ -17,6 +17,8 @@ import {
   SESSION_EXPIRED_EVENT,
 } from "../services/session";
 
+import { clearPendingUploads } from "../lib/pendingUploads";
+
 import type { AuthUser, Credentials, SignupPayload } from "../types/auth";
 
 import { AuthContext, type AuthStatus } from "./AuthContext";
@@ -45,6 +47,10 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = useCallback(() => {
     clearSession();
+
+    /* sessionStorage outlives the session, so empty it explicitly */
+    clearPendingUploads();
+
     setSession({ user: null, status: "guest" });
   }, []);
 
