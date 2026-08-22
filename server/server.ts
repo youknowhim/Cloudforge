@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import fileRoutes from "./src/routes/file.route";
+import userRoutes from "./src/routes/user.route";
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ app.use((_req, res, next) => {
 // file routes
 
 app.use("/files", fileRoutes);
+app.use("/users", userRoutes);
 
 
 // 404 handler

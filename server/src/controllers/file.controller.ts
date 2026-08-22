@@ -262,10 +262,21 @@ export async function getFiles(
   JOIN users u
     ON u.id = f.user_id
 
-  WHERE f.status = 'clean'
-    AND (
-      f.user_id = $1
-      OR f.share_to_emails @> $2::jsonb
+  WHERE (
+      f.status = 'clean'
+      AND (
+        f.user_id = $1
+        OR f.share_to_emails @> $2::jsonb
+      )
+    )
+    /*
+      Owners also see their own rejected uploads, so a file that was
+      turned away (too large, failed a check) says so instead of
+      silently never showing up.
+    */
+    OR (
+      f.status = 'failed'
+      AND f.user_id = $1
     )
 
   ORDER BY f.created_at DESC
