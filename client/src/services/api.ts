@@ -246,6 +246,27 @@ export const signup = (payload: SignupPayload): Promise<SignupResponse> =>
 export type { AuthUser };
 
 /* =========================================================
+   Users
+   ========================================================= */
+
+/*
+  Existence check for the share box. A GET with the address in the
+  query string, debounced by the caller so a fast typist doesn't fire
+  one request per keystroke.
+*/
+export const checkUserEmail = async (
+  email: string,
+  signal?: AbortSignal
+): Promise<boolean> => {
+  const payload = await request<EmailCheckResult>(
+    `/users/check-email?email=${encodeURIComponent(email.trim().toLowerCase())}`,
+    { signal }
+  );
+
+  return Boolean(payload?.exists);
+};
+
+/* =========================================================
    Files
    ========================================================= */
 
@@ -267,23 +288,6 @@ export const getFileDetail = async (fileId: string): Promise<FileDetail> => {
     downloadUrl: payload.downloadUrl,
     expiresIn: payload.expiresIn,
   };
-};
-
-/*
-  Existence check for the share box. Sent as a GET with the address in
-  the query string, and debounced by the caller so a fast typist
-  doesn't fire one request per keystroke.
-*/
-export const checkUserEmail = async (
-  email: string,
-  signal?: AbortSignal
-): Promise<boolean> => {
-  const payload = await request<EmailCheckResult>(
-    `/users/check-email?email=${encodeURIComponent(email.trim().toLowerCase())}`,
-    { signal }
-  );
-
-  return Boolean(payload?.exists);
 };
 
 export const createFile = (
