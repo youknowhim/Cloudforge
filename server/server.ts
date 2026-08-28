@@ -22,7 +22,7 @@ app.use(
 
 // health
 
-app.get("/", (_req, res) => {
+app.get("/health", (_req, res) => {
   res.status(200).json({
     message: "CloudForge API is running",
   });

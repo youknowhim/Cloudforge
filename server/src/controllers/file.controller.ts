@@ -39,6 +39,7 @@ import {
 
 interface CachedFile {
   id: string;
+  thumbnail_key: string | null;
   user_id: string;
   file_name: string;
   title: string;
@@ -245,6 +246,7 @@ export async function getFiles(
     f.user_id,
     f.file_name,
     f.title,
+    f.thumbnail_key,
     f.description,
     f.mime_type,
     f.size,
@@ -295,6 +297,7 @@ const responseFiles = files.map((file) => {
   if (isOwner) {
     return {
       id: file.id,
+      thumbnailKey: file.thumbnail_key,
       fileName: file.file_name,
       title: file.title,
       description: file.description,
@@ -309,6 +312,7 @@ const responseFiles = files.map((file) => {
 
   return {
     id: file.id,
+    thumbnailKey: file.thumbnail_key,
     fileName: file.file_name,
     title: file.title,
     description: file.description,
@@ -381,7 +385,6 @@ if (cachedFile) {
   return res.status(200).json({
     file: cachedFile.responseFile,
     downloadUrl: cachedFile.downloadUrl,
-    expiresIn: 900,
   });
 }
 
