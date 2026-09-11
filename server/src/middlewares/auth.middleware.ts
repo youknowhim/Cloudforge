@@ -33,7 +33,15 @@ export function authMiddleware(
      * We expect API Gateway to forward the authenticated
      * user's identity to Express.
      */
-
+    if(process.env.SETUP === "DEVELOPMENT") {
+      console.log("dev skipping authentication");
+      req.user={
+        id: "9b1b0146-4789-4e0d-9d36-e6b8401518ad",
+        email: "pallavrai39@gmail.com"
+      }
+      next();
+      return;
+    }
     const userId = req.header("X-User-Id");
     const email = req.header("X-User-Email");
 
@@ -67,7 +75,7 @@ export function authMiddleware(
     );
 
     return res.status(401).json({
-      message: "Unauthorizedd",
+      message: "Unauthorized",
     });
   }
 }

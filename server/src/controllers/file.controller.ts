@@ -226,8 +226,12 @@ export async function getFiles(
 ) {
   try {
     const userId = req.user!.id;
+    // const search = req.query.search;
+    const page = Number(req.query.page) || 1;
     const email = req.user!.email;
+    const limit = 5;
     const cacheKey = `files:user:${userId}`;
+    const offset = (page-1)*limit;
 
     // 1. Check Redis
     const cachedFiles = await redis.get<CachedFile[]>(cacheKey);
@@ -238,6 +242,8 @@ export async function getFiles(
         files: cachedFiles,
       });
     }
+
+    console.log("userId, email, limit, offset:", userId, email, limit, offset);
 
     const result = await pool.query(
   `
@@ -282,10 +288,14 @@ export async function getFiles(
     )
 
   ORDER BY f.created_at DESC
+  LIMIT $3 OFFSET $4
   `,
+  // console.log("userId, email, limit, offset:", userId, email, limit, offset),
   /* jsonb containment needs the email as a JSON scalar: "a@b.com" */
-  [userId, JSON.stringify(email)]
+  [userId, JSON.stringify(email) ,limit,offset]
 );
+
+
 
 
    const files = result.rows as CachedFile[];
@@ -642,50 +652,30 @@ export async function removeFile(
 
     const { id } = req.params;
 
-
-    /* ---------- Find file ---------- */
-
-    const result = await pool.query(
+     const result = await pool.query(
       `
-      SELECT
-        id,
-        s3_key
-      FROM files
-      WHERE id = $1
-        AND user_id = $2
+      DELETE FROM files
+      WHERE id = $1 AND user_id = $2
+      RETURNING s3_key, thumbnail_key
       `,
       [id, userId]
     );
-
-
     if (result.rows.length === 0) {
       return res.status(404).json({
         message: "File not found",
       });
     }
-
-
-    const s3Key = result.rows[0].s3_key;
+    const { s3_key, thumbnail_key } = result.rows[0];
+    await redis.del(`files:${id}:user:${userId}`);
+    await redis.del(`files:user:${userId}`);
 
 
     /* ---------- Delete S3 object ---------- */
-
-    await deleteS3Object(s3Key);
-
-
-    /* ---------- Delete PostgreSQL record ---------- */
-
-    await pool.query(
-      `
-      DELETE FROM files
-      WHERE id = $1
-        AND user_id = $2
-      `,
-      [id, userId]
-    );
-
-    await redis.del(`files:${id}:user:${userId}`);
-    await redis.del(`files:user:${userId}`);
+   try {
+      await deleteS3Object(s3_key);
+    } catch (error) {
+      console.error("Orphaned S3 object after delete:", s3_key, error);
+    }
 
     return res.status(200).json({
       message: "File deleted successfully",
