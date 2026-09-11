@@ -243,8 +243,6 @@ export async function getFiles(
       });
     }
 
-    console.log("userId, email, limit, offset:", userId, email, limit, offset);
-
     const result = await pool.query(
   `
   SELECT
