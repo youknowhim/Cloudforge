@@ -229,7 +229,7 @@ export async function getFiles(
     // const search = req.query.search;
     // const page = Number(req.query.page) || 1;
     const email = req.user!.email;
-    const limit = 5;
+    // const limit = 5;
     const cacheKey = `files:user:${userId}`;
     // const offset = (page-1)*limit;
 
@@ -289,7 +289,7 @@ export async function getFiles(
   `,
   // console.log("userId, email, limit, offset:", userId, email, limit, offset),
   /* jsonb containment needs the email as a JSON scalar: "a@b.com" */
-  [userId, JSON.stringify(email) ,limit,offset]
+  [userId, JSON.stringify(email)]
 );
 
 
