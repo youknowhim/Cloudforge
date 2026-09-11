@@ -227,11 +227,11 @@ export async function getFiles(
   try {
     const userId = req.user!.id;
     // const search = req.query.search;
-    const page = Number(req.query.page) || 1;
+    // const page = Number(req.query.page) || 1;
     const email = req.user!.email;
     const limit = 5;
     const cacheKey = `files:user:${userId}`;
-    const offset = (page-1)*limit;
+    // const offset = (page-1)*limit;
 
     // 1. Check Redis
     const cachedFiles = await redis.get<CachedFile[]>(cacheKey);
@@ -288,7 +288,6 @@ export async function getFiles(
     )
 
   ORDER BY f.created_at DESC
-  LIMIT $3 OFFSET $4
   `,
   // console.log("userId, email, limit, offset:", userId, email, limit, offset),
   /* jsonb containment needs the email as a JSON scalar: "a@b.com" */
